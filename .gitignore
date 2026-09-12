@@ -1,0 +1,22 @@
+# Byte-compiled / cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editors
+.vscode/
+.idea/
+
+# App-generated output
+screenshots/
+config.json
+gesture_control/_models/
+
+# OS cruft
+.DS_Store
+Thumbs.db

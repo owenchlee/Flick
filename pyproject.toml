@@ -1,0 +1,10 @@
+[project]
+name = "thumb-detector"
+version = "2.0.0"
+description = "Control your mouse, clipboard, and more with hand gestures, using nothing but a webcam."
+requires-python = ">=3.9"
+readme = "README.md"
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

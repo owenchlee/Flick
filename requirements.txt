@@ -1,0 +1,6 @@
+opencv-python>=4.9
+mediapipe>=0.10
+pyautogui>=0.9.54
+keyboard>=0.13.5
+numpy>=1.26
+customtkinter>=5.2
