@@ -67,7 +67,7 @@ def analyze(landmarks) -> GestureState:
     # Project onto the hand's own axis (wrist -> middle MCP) so it holds under rotation/mirroring.
     mid = landmarks[MIDDLE_MCP]
     ax, ay = (mid[0] - wrist[0]) / palm_size, (mid[1] - wrist[1]) / palm_size
-    thumb_points_up = ((thumb_tip[0] - thumb_mcp[0]) * ax + (thumb_tip[1] - thumb_mcp[1]) * ay) > vertical_margin
+    thumb_points_up = ((thumb_tip[0] - landmarks[3][0] + thumb_tip[0] - thumb_mcp[0]) * ax + (thumb_tip[1] - landmarks[3][1] + thumb_tip[1] - thumb_mcp[1]) * ay) / 2 > vertical_margin
     # Measure to the index/middle knuckle midpoint: a more central target is less jitter-sensitive than one knuckle.
     knuckle_mid = ((landmarks[INDEX_MCP][0] + mid[0]) / 2, (landmarks[INDEX_MCP][1] + mid[1]) / 2)
     thumb_near_palm = _dist(thumb_tip, knuckle_mid) < palm_size * 0.55
