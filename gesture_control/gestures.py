@@ -61,7 +61,7 @@ def analyze(landmarks) -> GestureState:
     thumb_tip = landmarks[THUMB_TIP]
     thumb_mcp = landmarks[THUMB_MCP]
     thumb_ext = _dist(wrist, thumb_tip) > _dist(wrist, thumb_mcp) * 1.05
-    vertical_margin = palm_size * 0.15
+    vertical_margin = palm_size * 0.05
     thumb_points_up = thumb_tip[1] < thumb_mcp[1] - vertical_margin
     thumb_near_palm = _dist(thumb_tip, landmarks[INDEX_MCP]) < palm_size * 0.55
 
