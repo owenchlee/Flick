@@ -54,7 +54,7 @@ def analyze(landmarks) -> GestureState:
 
     index_ext = _finger_extended(landmarks, wrist, INDEX_PIP, INDEX_TIP, palm=palm_size)
     middle_ext = _finger_extended(landmarks, wrist, MIDDLE_PIP, MIDDLE_TIP, palm=palm_size)
-    ring_ext = _finger_extended(landmarks, wrist, RING_PIP, RING_TIP, palm=palm_size)
+    ring_ext = _finger_extended(landmarks, wrist, RING_PIP, RING_TIP, margin=0.40, palm=palm_size)
     pinky_ext = _finger_extended(landmarks, wrist, PINKY_PIP, PINKY_TIP, margin=0.40, palm=palm_size)  # short finger: needs a larger margin to reject jitter
     four_curled = not any((index_ext, middle_ext, ring_ext, pinky_ext))
 
