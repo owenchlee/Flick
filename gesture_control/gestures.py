@@ -35,7 +35,9 @@ def _finger_extended(landmarks, wrist, pip_idx: int, tip_idx: int, margin: float
     """A finger reads as extended when its tip sits farther from the wrist
     than its own PIP joint does — robust to hand rotation/tilt, unlike a
     naive "tip.y < pip.y" check that only works on an upright hand."""
-    return _dist(wrist, landmarks[tip_idx]) > _dist(wrist, landmarks[pip_idx]) + margin * palm
+    tip_d = _dist(wrist, landmarks[tip_idx])
+    # Also require the tip to clear the MCP (pip_idx - 1) by a margin: a second, independent cue against jitter.
+    return tip_d > _dist(wrist, landmarks[pip_idx]) + margin * palm and tip_d > _dist(wrist, landmarks[pip_idx - 1]) + 0.45 * palm
 
 
 @dataclass
