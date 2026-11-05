@@ -31,11 +31,11 @@ def _dist(a, b) -> float:
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
-def _finger_extended(landmarks, wrist, pip_idx: int, tip_idx: int, factor: float = 1.25) -> bool:
+def _finger_extended(landmarks, wrist, pip_idx: int, tip_idx: int, margin: float = 0.23, palm: float = 1.0) -> bool:
     """A finger reads as extended when its tip sits farther from the wrist
     than its own PIP joint does — robust to hand rotation/tilt, unlike a
     naive "tip.y < pip.y" check that only works on an upright hand."""
-    return _dist(wrist, landmarks[tip_idx]) > _dist(wrist, landmarks[pip_idx]) * factor
+    return _dist(wrist, landmarks[tip_idx]) > _dist(wrist, landmarks[pip_idx]) + margin * palm
 
 
 @dataclass
@@ -52,10 +52,10 @@ def analyze(landmarks) -> GestureState:
     wrist = landmarks[WRIST]
     palm_size = max(_dist(wrist, landmarks[MIDDLE_MCP]), 1e-6)
 
-    index_ext = _finger_extended(landmarks, wrist, INDEX_PIP, INDEX_TIP)
-    middle_ext = _finger_extended(landmarks, wrist, MIDDLE_PIP, MIDDLE_TIP)
-    ring_ext = _finger_extended(landmarks, wrist, RING_PIP, RING_TIP)
-    pinky_ext = _finger_extended(landmarks, wrist, PINKY_PIP, PINKY_TIP)
+    index_ext = _finger_extended(landmarks, wrist, INDEX_PIP, INDEX_TIP, palm=palm_size)
+    middle_ext = _finger_extended(landmarks, wrist, MIDDLE_PIP, MIDDLE_TIP, palm=palm_size)
+    ring_ext = _finger_extended(landmarks, wrist, RING_PIP, RING_TIP, palm=palm_size)
+    pinky_ext = _finger_extended(landmarks, wrist, PINKY_PIP, PINKY_TIP, palm=palm_size)
     four_curled = not any((index_ext, middle_ext, ring_ext, pinky_ext))
 
     thumb_tip = landmarks[THUMB_TIP]
