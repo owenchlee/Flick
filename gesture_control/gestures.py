@@ -31,7 +31,7 @@ def _dist(a, b) -> float:
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
-def _finger_extended(landmarks, wrist, pip_idx: int, tip_idx: int, factor: float = 1.05) -> bool:
+def _finger_extended(landmarks, wrist, pip_idx: int, tip_idx: int, factor: float = 1.25) -> bool:
     """A finger reads as extended when its tip sits farther from the wrist
     than its own PIP joint does — robust to hand rotation/tilt, unlike a
     naive "tip.y < pip.y" check that only works on an upright hand."""
