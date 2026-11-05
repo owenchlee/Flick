@@ -73,7 +73,7 @@ def analyze(landmarks) -> GestureState:
     thumb_near_palm = _dist(thumb_tip, knuckle_mid) < palm_size * 0.55
 
     thumbs_up = four_curled and thumb_ext and thumb_points_up
-    fist = four_curled and thumb_near_palm
+    fist = four_curled and (thumb_near_palm or not thumbs_up)
     peace = index_ext and middle_ext and not ring_ext and not pinky_ext
     # "Rock on" sign — index + pinky extended, middle/ring curled. Reserved
     # as a pose distinct from "point" (which only extends the index finger)
