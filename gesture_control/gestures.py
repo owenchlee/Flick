@@ -63,7 +63,7 @@ def analyze(landmarks) -> GestureState:
     thumb_tip = landmarks[THUMB_TIP]
     thumb_mcp = landmarks[THUMB_MCP]
     thumb_ext = _dist(wrist, thumb_tip) > _dist(wrist, thumb_mcp) * 1.05
-    vertical_margin = palm_size * 0.05
+    vertical_margin = palm_size * 0.5
     # Project onto the hand's own axis (wrist -> middle MCP) so it holds under rotation/mirroring.
     mid = landmarks[MIDDLE_MCP]
     ax, ay = (mid[0] - wrist[0]) / palm_size, (mid[1] - wrist[1]) / palm_size
