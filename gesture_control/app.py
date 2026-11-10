@@ -151,6 +151,9 @@ class GestureControlApp:
 
                 cv2.imshow(WINDOW_TITLE, frame)
                 cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 1)
+                # The X button hides the window but imshow would re-create it: quit instead.
+                if cv2.getWindowProperty(WINDOW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
+                    break
         finally:
             self.executor.release_all_holds()
             if self.camera:
