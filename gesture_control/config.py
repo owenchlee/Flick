@@ -102,15 +102,27 @@ class AppConfig:
         }
 
 
+def load_config_strict(path: Path = CONFIG_PATH) -> AppConfig:
+    """Like load_config but raises ValueError/OSError if the file exists and is bad."""
+    if not path.exists():
+        return AppConfig.default()
+    with open(path, "r", encoding="utf-8") as fh:
+        data = json.load(fh)  # JSONDecodeError is a ValueError
+    if not isinstance(data, dict) or not data:
+        raise ValueError("config must be a non-empty JSON object")
+    try:
+        return AppConfig.from_dict(data)
+    except (AttributeError, TypeError) as exc:
+        raise ValueError(f"wrong-shaped config: {exc}") from exc
+
+
 def load_config(path: Path = CONFIG_PATH) -> AppConfig:
     if not path.exists():
         return AppConfig.default()
     try:
-        with open(path, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-    except (json.JSONDecodeError, OSError):
+        return load_config_strict(path)
+    except (ValueError, OSError):
         return AppConfig.default()
-    return AppConfig.from_dict(data)
 
 
 def save_config(config: AppConfig, path: Path = CONFIG_PATH) -> None:

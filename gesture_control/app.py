@@ -18,7 +18,7 @@ import numpy as np
 import pyautogui
 
 from .actions import ACTIONS, SCROLL_PREV, ActionExecutor
-from .config import GESTURE_IDS, AppConfig, load_config
+from .config import GESTURE_IDS, AppConfig, load_config, load_config_strict
 from .gestures import analyze
 from .hand_tracker import Camera, HandTracker
 from .overlay import draw_cursor, draw_grid, draw_hud
@@ -148,6 +148,8 @@ class GestureControlApp:
     # ─── Per-frame helpers ─────────────────────────────────────────────────
     def _handle_keys(self) -> bool:
         key = cv2.waitKey(1) & 0xFF
+        if 65 <= key <= 90:  # Caps Lock: fold upper-case to lower-case
+            key += 32
         if key in (ord("q"), 27):
             return False
         if key == ord("g"):
@@ -158,7 +160,16 @@ class GestureControlApp:
             self.smoother.reset()
             self._flash("RESET")
         elif key == ord("c"):
-            self.config = load_config()
+            try:
+                new_config = load_config_strict()
+            except (ValueError, OSError):
+                self._flash("CONFIG ERROR - KEPT CURRENT")
+                return True
+            self.config = new_config
+            # Drop stale holds (e.g. fist button-down); still-bound ones re-engage next frame.
+            self.executor.release_all_holds()
+            self.show_grid = new_config.settings.show_grid
+            self.show_landmarks = new_config.settings.show_landmarks
             self.smoother.resize(self.config.settings.smoothing)
             self._flash("CONFIG RELOADED")
         return True
