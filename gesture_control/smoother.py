@@ -64,17 +64,17 @@ class OneEuroSmoother:
         now = time.monotonic()
         x = (float(point[0]), float(point[1]))
         if self._prev is None or self.min_cutoff is None:
-            self._prev = (now, x, (0.0, 0.0))
+            self._prev = (now, x, (0.0, 0.0), x)
             return (int(x[0]), int(x[1]))
-        t0, fx, fd = self._prev
+        t0, fx, fd, rx = self._prev
         dt = now - t0
         if dt <= 1e-4:  # identical or backwards timestamps: assume 30 fps
             dt = 1 / 30
         ad = self._alpha(self.D_CUTOFF, dt)
-        d = [(x[i] - fx[i]) / dt for i in range(2)]
+        d = [(x[i] - rx[i]) / dt for i in range(2)]
         fd = tuple(fd[i] + ad * (d[i] - fd[i]) for i in range(2))
         cutoff = self.min_cutoff + self.BETA * math.hypot(*fd)
         a = self._alpha(cutoff, dt)
         fx = tuple(fx[i] + a * (x[i] - fx[i]) for i in range(2))
-        self._prev = (now, fx, fd)
+        self._prev = (now, fx, fd, x)
         return (round(fx[0]), round(fx[1]))
