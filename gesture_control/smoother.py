@@ -77,4 +77,4 @@ class OneEuroSmoother:
         a = self._alpha(cutoff, dt)
         fx = tuple(fx[i] + a * (x[i] - fx[i]) for i in range(2))
         self._prev = (now, fx, fd)
-        return (int(fx[0]), int(fx[1]))
+        return (round(fx[0]), round(fx[1]))
