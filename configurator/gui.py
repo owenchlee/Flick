@@ -387,21 +387,36 @@ class ConfiguratorApp(ctk.CTk):
 
     def _save(self):
         self.config = self._collect_config()
-        save_config(self.config)
+        if not _write_config(self):
+            return False
         self._dirty = False
         self.status_label.configure(text="Saved ✓", text_color=theme.SUCCESS)
         self.after(2500, lambda: self.status_label.configure(text=""))
+        return True
 
     def _save_and_launch(self):
-        self._save()
+        if not self._save():
+            return
         subprocess.Popen([sys.executable, str(MAIN_PY)], cwd=str(MAIN_PY.parent))
         self.status_label.configure(text="Saved ✓ · Launching…", text_color=theme.SUCCESS)
 
     def _reset_defaults(self):
         self.config = AppConfig.default()
-        save_config(self.config)
+        if not _write_config(self):
+            return
         self.destroy()
         run_configurator()
+
+
+def _write_config(app):
+    """Save app.config; on failure keep it dirty and show a red status. Returns success."""
+    try:
+        save_config(app.config)
+    except OSError as exc:
+        app._dirty = True
+        app.status_label.configure(text=f"Could not save: {exc}", text_color=theme.DANGER)
+        return False
+    return True
 
 
 def run_configurator():

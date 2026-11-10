@@ -7,6 +7,7 @@ are picked up by the other.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -114,6 +115,19 @@ def load_config(path: Path = CONFIG_PATH) -> AppConfig:
 
 
 def save_config(config: AppConfig, path: Path = CONFIG_PATH) -> None:
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(config.to_dict(), fh, indent=2)
-        fh.write("\n")
+    # Write to a temp file in the same dir, then atomically replace the target.
+    path = Path(path)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(config.to_dict(), fh, indent=2)
+            fh.write("\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
