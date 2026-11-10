@@ -66,8 +66,7 @@ class GestureControlApp:
         self._cooldowns = {gesture_id: 0.0 for gesture_id in GESTURE_IDS}
         # State for the point-driven "flick up to advance" scroll gesture —
         # see _dispatch's "scroll" branch.
-        self._flick_prev_y = None
-        self._flick_prev_t = None
+        self._flick_hist = deque()
         self._flick_armed = True
 
     def _flash(self, text: str | None) -> None:
@@ -122,8 +121,7 @@ class GestureControlApp:
                     self.executor.release_all_holds()
                     self.smoother.reset()
                     self._cursor_history.clear()
-                    self._flick_prev_y = None
-                    self._flick_prev_t = None
+                    self._flick_hist.clear()
                     self._flick_armed = True
 
                 self._update_fps()
@@ -223,19 +221,29 @@ class GestureControlApp:
                 # back down, so calmly holding the same pointed-finger pose
                 # (e.g. to aim before a thumbs-up) never triggers it.
                 if not is_active:
-                    self._flick_prev_y = None
-                    self._flick_prev_t = None
-                    self._flick_armed = True
+                    # tolerate a single dropped pose frame; reset after a real release
+                    if not self._flick_hist or now - self._flick_hist[-1][0] > 0.2:
+                        self._flick_hist.clear()
+                        self._flick_armed = True
                     continue
 
                 norm_y = self._normalized_y(state.cursor[1])
-                if self._flick_prev_y is not None:
-                    dt = max(now - self._flick_prev_t, 1e-3)
-                    velocity = (norm_y - self._flick_prev_y) / dt  # negative = moving up
+                # Velocity is the net displacement over a ~0.15 s window, not
+                # one frame pair, so jitter and batched frames do not fire it.
+                hist = self._flick_hist
+                if hist and now - hist[-1][0] > 0.3:  # camera hiccup: start over
+                    hist.clear()
+                hist.append((now, norm_y))
+                while len(hist) > 2 and now - hist[1][0] >= 0.15:
+                    hist.popleft()
+                span = now - hist[0][0]
+                if span >= 0.05:
+                    velocity = (norm_y - hist[0][1]) / span  # negative = moving up
                     fired_recently = (
                         now - self._cooldowns.get(gesture_id, 0.0) < self.config.settings.action_cooldown
                     )
-                    if self._flick_armed and not fired_recently and velocity < -self.config.settings.flick_velocity:
+                    big_enough = hist[0][1] - norm_y >= 0.05
+                    if self._flick_armed and not fired_recently and big_enough and velocity < -self.config.settings.flick_velocity:
                         self.executor.scroll(spec.id, -self.config.settings.scroll_sensitivity)
                         self._flash("NEXT REEL")
                         self._cooldowns[gesture_id] = now
@@ -243,8 +251,6 @@ class GestureControlApp:
                     elif velocity > -self.config.settings.flick_velocity * 0.5:
                         self._flick_armed = True
 
-                self._flick_prev_y = norm_y
-                self._flick_prev_t = now
                 continue
 
             if not is_active:
