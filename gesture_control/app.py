@@ -126,14 +126,21 @@ class GestureControlApp:
                         print(f"Hand tracker failed on a frame ({exc}); continuing.")
                         tracker_error_reported = True
 
+                state = None
                 if result is not None and result.multi_hand_landmarks:
-                    hand_present = True
                     hand_landmarks = result.multi_hand_landmarks[0]
+                    try:
+                        state = analyze(HandTracker.to_points(hand_landmarks))
+                    except ValueError as exc:
+                        # Partial landmark list from the tracker: treat as "no hand".
+                        if not tracker_error_reported:
+                            print(f"Bad landmarks from tracker ({exc}); continuing.")
+                            tracker_error_reported = True
+
+                if state is not None:
+                    hand_present = True
                     if self.show_landmarks:
                         self.tracker.draw(frame, hand_landmarks)
-
-                    points = HandTracker.to_points(hand_landmarks)
-                    state = analyze(points)
                     active = state.active
 
                     self._drive_cursor(frame, state)
