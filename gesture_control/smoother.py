@@ -36,7 +36,7 @@ class OneEuroSmoother:
     Same interface as Smoother; `size` (the 1..20 slider) sets the resting cutoff.
     """
 
-    BETA = 0.02  # cutoff gain per px/s of hand speed
+    BETA = 0.006  # cutoff gain per px/s of hand speed
     D_CUTOFF = 2.0  # Hz, smoothing of the speed estimate
     GAMMA = 5e-6  # extra cutoff gain per (px/s)^2: opens up fast on big sweeps
     SPEED_FLOOR = 60.0  # px/s of estimated speed treated as tracking noise
