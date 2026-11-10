@@ -50,7 +50,7 @@ class OneEuroSmoother:
     def resize(self, size: int) -> None:
         self.size = max(1, size)
         # size 1 is raw; higher means a lower resting cutoff (steadier, more lag)
-        self.min_cutoff = None if self.size <= 1 else 8.0 / self.size
+        self.min_cutoff = None if self.size <= 1 else 4.0 / self.size
 
     def reset(self) -> None:
         self._prev = None  # (t, filtered xy, filtered speed xy)
