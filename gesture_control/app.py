@@ -88,7 +88,11 @@ class GestureControlApp:
         try:
             while self.camera.is_opened():
                 ok, frame = self.camera.read()
-                if not ok:
+                if not ok or frame is None:
+                    # Keep keys responsive and avoid a 100% CPU spin on a dead read.
+                    if not self._handle_keys():
+                        break
+                    time.sleep(0.02)
                     continue
 
                 if self.config.settings.mirror:
