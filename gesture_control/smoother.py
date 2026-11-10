@@ -41,7 +41,7 @@ class OneEuroSmoother:
     """
 
     BETA = 0.03  # cutoff gain per px/s of hand speed
-    D_CUTOFF = 1.0  # Hz, smoothing of the speed estimate
+    D_CUTOFF = 2.0  # Hz, smoothing of the speed estimate
 
     def __init__(self, size: int = 7):
         self.resize(size)
