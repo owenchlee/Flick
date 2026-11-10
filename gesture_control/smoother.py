@@ -40,7 +40,7 @@ class OneEuroSmoother:
     Same interface as Smoother; `size` (the 1..20 slider) sets the resting cutoff.
     """
 
-    BETA = 0.02  # cutoff gain per px/s of hand speed
+    BETA = 0.03  # cutoff gain per px/s of hand speed
     D_CUTOFF = 1.0  # Hz, smoothing of the speed estimate
 
     def __init__(self, size: int = 7):
