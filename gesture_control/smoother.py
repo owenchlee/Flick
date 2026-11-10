@@ -11,8 +11,6 @@ from __future__ import annotations
 import math
 import time
 from collections import deque
-
-
 class Smoother:
     def __init__(self, size: int = 7):
         self.size = max(1, size)
@@ -32,8 +30,6 @@ class Smoother:
         sx = sum(p[0] for p in self._pts)
         sy = sum(p[1] for p in self._pts)
         return (int(sx / n), int(sy / n))
-
-
 class OneEuroSmoother:
     """Adaptive low-pass (One Euro filter): heavy smoothing at rest, little while moving fast.
 
@@ -43,6 +39,7 @@ class OneEuroSmoother:
     BETA = 0.02  # cutoff gain per px/s of hand speed
     D_CUTOFF = 2.0  # Hz, smoothing of the speed estimate
     GAMMA = 1e-5  # extra cutoff gain per (px/s)^2: opens up fast on big sweeps
+    SPEED_FLOOR = 40.0  # px/s of estimated speed treated as tracking noise
 
     def __init__(self, size: int = 7):
         self.resize(size)
@@ -74,7 +71,8 @@ class OneEuroSmoother:
         ad = self._alpha(self.D_CUTOFF, dt)
         d = [(x[i] - rx[i]) / dt for i in range(2)]
         fd = tuple(fd[i] + ad * (d[i] - fd[i]) for i in range(2))
-        cutoff = self.min_cutoff + self.BETA * math.hypot(*fd) + self.GAMMA * math.hypot(*fd) ** 2
+        sp = max(0.0, math.hypot(*fd) - self.SPEED_FLOOR)
+        cutoff = self.min_cutoff + self.BETA * sp + self.GAMMA * sp ** 2
         a = self._alpha(cutoff, dt)
         fx = tuple(fx[i] + a * (x[i] - fx[i]) for i in range(2))
         self._prev = (now, fx, fd, x)
