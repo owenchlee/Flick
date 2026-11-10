@@ -205,11 +205,15 @@ class GestureControlApp:
                 continue
 
             is_active = state.active.get(gesture_id, False)
+            # Several gestures may share one action; hold/scroll state is per action.
+            any_active = any(
+                state.active.get(g, False) for g in GESTURE_IDS if self.config.bindings.get(g) == action_id
+            )
 
             if spec.kind == "hold":
                 if is_active:
                     self._flash(self.executor.begin_hold(spec.id))
-                else:
+                elif not any_active:
                     self._flash(self.executor.end_hold(spec.id))
                 continue
 
@@ -223,9 +227,10 @@ class GestureControlApp:
                 # back down, so calmly holding the same pointed-finger pose
                 # (e.g. to aim before a thumbs-up) never triggers it.
                 if not is_active:
-                    self._flick_prev_y = None
-                    self._flick_prev_t = None
-                    self._flick_armed = True
+                    if not any_active:
+                        self._flick_prev_y = None
+                        self._flick_prev_t = None
+                        self._flick_armed = True
                     continue
 
                 norm_y = self._normalized_y(state.cursor[1])
