@@ -42,6 +42,7 @@ class OneEuroSmoother:
 
     BETA = 0.02  # cutoff gain per px/s of hand speed
     D_CUTOFF = 2.0  # Hz, smoothing of the speed estimate
+    GAMMA = 1e-5  # extra cutoff gain per (px/s)^2: opens up fast on big sweeps
 
     def __init__(self, size: int = 7):
         self.resize(size)
@@ -73,7 +74,7 @@ class OneEuroSmoother:
         ad = self._alpha(self.D_CUTOFF, dt)
         d = [(x[i] - rx[i]) / dt for i in range(2)]
         fd = tuple(fd[i] + ad * (d[i] - fd[i]) for i in range(2))
-        cutoff = self.min_cutoff + self.BETA * math.hypot(*fd)
+        cutoff = self.min_cutoff + self.BETA * math.hypot(*fd) + self.GAMMA * math.hypot(*fd) ** 2
         a = self._alpha(cutoff, dt)
         fx = tuple(fx[i] + a * (x[i] - fx[i]) for i in range(2))
         self._prev = (now, fx, fd, x)
