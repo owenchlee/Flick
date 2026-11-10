@@ -22,7 +22,7 @@ from .config import GESTURE_IDS, AppConfig, load_config
 from .gestures import analyze
 from .hand_tracker import Camera, HandTracker
 from .overlay import draw_cursor, draw_grid, draw_hud
-from .smoother import Smoother
+from .smoother import OneEuroSmoother
 
 WINDOW_TITLE = "Thumb-Detector"
 FRAME_W, FRAME_H = 640, 480
@@ -33,7 +33,7 @@ class GestureControlApp:
         self.config = config or load_config()
 
         self.executor = ActionExecutor()
-        self.smoother = Smoother(size=self.config.settings.smoothing)
+        self.smoother = OneEuroSmoother(size=self.config.settings.smoothing)
         self.screen_w, self.screen_h = pyautogui.size()
 
         self.camera: Camera | None = None
