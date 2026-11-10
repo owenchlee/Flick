@@ -85,6 +85,7 @@ class GestureControlApp:
         self.camera.warm_up()
         self.tracker.wait_until_ready()
 
+        tracker_error_reported = False
         try:
             while self.camera.is_opened():
                 ok, frame = self.camera.read()
@@ -108,9 +109,16 @@ class GestureControlApp:
                 hand_present = False
 
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                result = self.tracker.process(rgb)
+                try:
+                    result = self.tracker.process(rgb)
+                except RuntimeError as exc:
+                    # One bad frame must not kill the app: treat it as "no hand".
+                    result = None
+                    if not tracker_error_reported:
+                        print(f"Hand tracker failed on a frame ({exc}); continuing.")
+                        tracker_error_reported = True
 
-                if result.multi_hand_landmarks:
+                if result is not None and result.multi_hand_landmarks:
                     hand_present = True
                     hand_landmarks = result.multi_hand_landmarks[0]
                     if self.show_landmarks:
