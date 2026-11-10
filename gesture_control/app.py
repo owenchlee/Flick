@@ -178,6 +178,15 @@ class GestureControlApp:
             self._flash("CONFIG RELOADED")
         return True
 
+    def _move_cursor(self, x, y) -> None:
+        # UAC / secure desktop / locked screen make moveTo fail: skip, don't crash.
+        try:
+            pyautogui.moveTo(x, y)
+        except (OSError, pyautogui.PyAutoGUIException) as exc:
+            if not getattr(self, "_move_error_reported", False):
+                print(f"Cannot move the cursor ({exc}); continuing.")
+                self._move_error_reported = True
+
     def _drive_cursor(self, frame, state) -> None:
         # Only track/move while the index finger is actually extended
         # (point or peace) — thumbs_up/fist curl it toward the palm, and
@@ -193,7 +202,7 @@ class GestureControlApp:
             mapped_y = np.clip(mapped_y, 0, self.screen_h)
 
             sx, sy = self.smoother.smooth((mapped_x, mapped_y))
-            pyautogui.moveTo(sx, sy)
+            self._move_cursor(sx, sy)
             frame_px = (int(state.cursor[0] * FRAME_W), int(state.cursor[1] * FRAME_H))
             self._cursor_frame_px = frame_px
             self._cursor_history.append((frame_px, (sx, sy)))
@@ -204,7 +213,7 @@ class GestureControlApp:
             # not wherever the fingertip drifted to mid-curl.
             pre_curl_frame_px, pre_curl_screen_xy = self._cursor_history[0]
             self._cursor_frame_px = pre_curl_frame_px
-            pyautogui.moveTo(*pre_curl_screen_xy)
+            self._move_cursor(*pre_curl_screen_xy)
             self._cursor_history.clear()
 
         if self._cursor_frame_px is not None:
