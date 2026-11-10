@@ -85,6 +85,14 @@ class GestureControlApp:
         self.camera.warm_up()
         self.tracker.wait_until_ready()
 
+        if not self.camera.is_opened():
+            index = self.config.settings.camera_index
+            self.camera.release()
+            raise RuntimeError(
+                f"Could not open camera {index}. Close other apps using it, or pick another "
+                "camera index in the configurator."
+            )
+
         tracker_error_reported = False
         try:
             while self.camera.is_opened():
