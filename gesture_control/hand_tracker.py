@@ -89,6 +89,7 @@ class HandTracker:
                  min_tracking_confidence: float = 0.7):
         self._mp = None
         self._landmarker = None
+        self._init_error = None
         self._connections = []
         self._start_time = time.monotonic()
         self._thread = threading.Thread(
@@ -99,6 +100,12 @@ class HandTracker:
         self._thread.start()
 
     def _init(self, max_num_hands, min_detection_confidence, min_tracking_confidence) -> None:
+        try:
+            self._load(max_num_hands, min_detection_confidence, min_tracking_confidence)
+        except Exception as exc:  # surfaced by wait_until_ready on the main thread
+            self._init_error = exc
+
+    def _load(self, max_num_hands, min_detection_confidence, min_tracking_confidence) -> None:
         import mediapipe as mp
         from mediapipe.tasks.python import BaseOptions, vision
 
@@ -119,6 +126,11 @@ class HandTracker:
 
     def wait_until_ready(self) -> None:
         self._thread.join()
+        if self._init_error is not None:
+            raise RuntimeError(
+                f"Could not load the hand model {MODEL_PATH.name} ({self._init_error}). "
+                "Check your network connection (it is downloaded on first run) and retry."
+            ) from self._init_error
 
     def process(self, rgb_frame):
         rgb_frame.flags.writeable = False
