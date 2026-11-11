@@ -11,6 +11,7 @@ from __future__ import annotations
 import time
 
 import cv2
+import numpy as np
 
 from . import theme
 from .actions import ACTIONS
@@ -24,7 +25,18 @@ def _rounded_rect(img, top_left, bottom_right, color, radius=10, alpha=1.0):
     x1, y1 = top_left
     x2, y2 = bottom_right
     radius = max(0, min(radius, (x2 - x1) // 2, (y2 - y1) // 2))
-    layer = img if alpha >= 1.0 else img.copy()
+    if alpha >= 1.0:
+        roi, ox, oy = img, 0, 0
+    else:
+        # Blend only the panel's bounding box instead of the whole frame.
+        h, w = img.shape[:2]
+        ox, oy = max(x1 - 1, 0), max(y1 - 1, 0)
+        ex, ey = min(x2 + 2, w), min(y2 + 2, h)
+        if ex <= ox or ey <= oy:
+            return
+        roi = img[oy:ey, ox:ex]
+    layer = roi if alpha >= 1.0 else roi.copy()
+    x1, x2, y1, y2 = x1 - ox, x2 - ox, y1 - oy, y2 - oy
 
     cv2.rectangle(layer, (x1 + radius, y1), (x2 - radius, y2), color, -1)
     cv2.rectangle(layer, (x1, y1 + radius), (x2, y2 - radius), color, -1)
@@ -37,18 +49,25 @@ def _rounded_rect(img, top_left, bottom_right, color, radius=10, alpha=1.0):
         cv2.ellipse(layer, (cx, cy), (radius, radius), start_angle, 0, 90, color, -1)
 
     if alpha < 1.0:
-        cv2.addWeighted(layer, alpha, img, 1 - alpha, 0, img)
+        cv2.addWeighted(layer, alpha, roi, 1 - alpha, 0, roi)
 
 
 def draw_grid(frame):
     h, w = frame.shape[:2]
-    overlay = frame.copy()
-    for i in range(1, 10):
-        y = h * i // 10
-        x = w * i // 10
-        cv2.line(overlay, (0, y), (w, y), theme.BGR["border"], 1)
-        cv2.line(overlay, (x, 0), (x, h), theme.BGR["border"], 1)
-    cv2.addWeighted(overlay, 0.35, frame, 0.65, 0, frame)
+    ys = [h * i // 10 for i in range(1, 10)]
+    xs = [w * i // 10 for i in range(1, 10)]
+    color = theme.BGR["border"]
+
+    def tint(px):
+        return cv2.addWeighted(px, 0.65, np.full_like(px, color), 0.35, 0)
+
+    # Blend only the line pixels; intersections are blended once, as before.
+    crossings = frame[np.ix_(ys, xs)]
+    for y in ys:
+        frame[y:y + 1, :] = tint(frame[y:y + 1, :])
+    for x in xs:
+        frame[:, x:x + 1] = tint(frame[:, x:x + 1])
+    frame[np.ix_(ys, xs)] = tint(crossings)
     cv2.putText(frame, "GRID", (10, h - 50), theme.CV_FONT, 0.4, theme.BGR["text_muted"], 1, cv2.LINE_AA)
 
 
