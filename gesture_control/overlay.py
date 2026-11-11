@@ -63,10 +63,8 @@ def draw_grid(frame):
 
     # Blend only the line pixels; intersections are blended once, as before.
     crossings = frame[np.ix_(ys, xs)]
-    for y in ys:
-        frame[y:y + 1, :] = tint(frame[y:y + 1, :])
-    for x in xs:
-        frame[:, x:x + 1] = tint(frame[:, x:x + 1])
+    frame[ys] = tint(frame[ys])
+    frame[:, xs] = tint(frame[:, xs])
     frame[np.ix_(ys, xs)] = tint(crossings)
     cv2.putText(frame, "GRID", (10, h - 50), theme.CV_FONT, 0.4, theme.BGR["text_muted"], 1, cv2.LINE_AA)
 
