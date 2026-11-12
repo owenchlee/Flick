@@ -94,9 +94,6 @@ class GestureControlApp:
                 if self.config.settings.mirror:
                     frame = cv2.flip(frame, 1)
 
-                if not self._handle_keys():
-                    break
-
                 if self.show_grid:
                     draw_grid(frame)
 
@@ -139,6 +136,10 @@ class GestureControlApp:
 
                 cv2.imshow(WINDOW_TITLE, frame)
                 cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 1)
+
+                # Polled after imshow so key handling never sits between capture and dispatch.
+                if not self._handle_keys():
+                    break
         finally:
             self.executor.release_all_holds()
             if self.camera:
