@@ -53,6 +53,20 @@ def _display_label(action_id: str) -> str:
     return f"{spec.category}  ·  {spec.label}{suffix}"
 
 
+class _LazyOptionMenu(ctk.CTkOptionMenu):
+    """Builds the dropdown entries only when first opened (saves startup time)."""
+
+    def __init__(self, master, all_values, **kwargs):
+        super().__init__(master, **kwargs)
+        self._all_values = all_values
+
+    def _open_dropdown_menu(self):
+        if self._all_values is not None:
+            self.configure(values=self._all_values)
+            self._all_values = None
+        super()._open_dropdown_menu()
+
+
 class GestureRow(ctk.CTkFrame):
     def __init__(self, master, gesture_id: str, config: AppConfig, on_change):
         super().__init__(master, fg_color=theme.SURFACE, corner_radius=10)
@@ -82,9 +96,10 @@ class GestureRow(ctk.CTkFrame):
 
         current_action = config.bindings.get(gesture_id, "none")
         self.menu_var = ctk.StringVar(value=self._id_to_label.get(current_action, self._id_to_label["none"]))
-        self.menu = ctk.CTkOptionMenu(
+        self.menu = _LazyOptionMenu(
             self,
-            values=[self._id_to_label[a] for a in _action_choices()],
+            all_values=[self._id_to_label[a] for a in _action_choices()],
+            values=[self.menu_var.get()],
             variable=self.menu_var,
             command=self._on_select,
             fg_color=theme.SURFACE_MUTED,
