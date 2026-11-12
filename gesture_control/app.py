@@ -82,8 +82,6 @@ class GestureControlApp:
 
         self.tracker = HandTracker()
         self.camera = Camera(index=self.config.settings.camera_index, width=FRAME_W, height=FRAME_H)
-        self.camera.warm_up()
-        self.tracker.wait_until_ready()
 
         try:
             while self.camera.is_opened():
@@ -96,6 +94,15 @@ class GestureControlApp:
 
                 if not self._handle_keys():
                     break
+
+                if not self.tracker.is_ready():
+                    # Show the camera while the model loads; no tracking, no actions.
+                    cv2.putText(frame, "Loading hand tracking...", (10, 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                    cv2.imshow(WINDOW_TITLE, frame)
+                    cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 1)
+                    continue
+                self.tracker.wait_until_ready()  # raises if the model failed to load
 
                 if self.show_grid:
                     draw_grid(frame)

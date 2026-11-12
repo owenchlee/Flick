@@ -117,8 +117,13 @@ class HandTracker:
         ]
         self._landmarker = vision.HandLandmarker.create_from_options(options)
 
+    def is_ready(self) -> bool:
+        return not self._thread.is_alive()
+
     def wait_until_ready(self) -> None:
         self._thread.join()
+        if self._landmarker is None:
+            raise RuntimeError("hand tracker failed to load; see the traceback above")
 
     def process(self, rgb_frame):
         rgb_frame.flags.writeable = False
