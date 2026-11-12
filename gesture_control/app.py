@@ -10,6 +10,7 @@ configurator remap any gesture to any action without touching this file.
 
 from __future__ import annotations
 
+import math
 import time
 from collections import deque
 
@@ -23,6 +24,11 @@ from .gestures import analyze
 from .hand_tracker import Camera, HandTracker
 from .overlay import draw_cursor, draw_grid, draw_hud
 from .smoother import Smoother
+
+# A flick only counts after the point pose has been tracked this long, and not
+# across a frame where the wrist jumped more than this many palm sizes.
+FLICK_ARM_DELAY = 0.15
+FLICK_JUMP_PALMS = 1.0
 
 WINDOW_TITLE = "Thumb-Detector"
 FRAME_W, FRAME_H = 640, 480
@@ -69,6 +75,8 @@ class GestureControlApp:
         self._flick_prev_y = None
         self._flick_prev_t = None
         self._flick_armed = True
+        self._flick_since = None
+        self._flick_prev_wrist = None
 
     def _flash(self, text: str | None) -> None:
         if not text:
@@ -125,6 +133,8 @@ class GestureControlApp:
                     self._flick_prev_y = None
                     self._flick_prev_t = None
                     self._flick_armed = True
+                    self._flick_since = None
+                    self._flick_prev_wrist = None
 
                 self._update_fps()
                 draw_hud(
@@ -222,11 +232,21 @@ class GestureControlApp:
                 # fixed-size pulse and then disarms until the finger slows
                 # back down, so calmly holding the same pointed-finger pose
                 # (e.g. to aim before a thumbs-up) never triggers it.
-                if not is_active:
-                    self._flick_prev_y = None
-                    self._flick_prev_t = None
+                wx, wy = state.wrist
+                jumped = (
+                    self._flick_prev_wrist is not None
+                    and math.hypot(wx - self._flick_prev_wrist[0], wy - self._flick_prev_wrist[1])
+                    > FLICK_JUMP_PALMS * state.palm_size
+                )
+                self._flick_prev_wrist = (wx, wy) if is_active else None
+                if not is_active or jumped:
+                    self._flick_since = now if is_active else None
+                    self._flick_prev_y = self._normalized_y(state.cursor[1]) if is_active else None
+                    self._flick_prev_t = now if is_active else None
                     self._flick_armed = True
                     continue
+                if self._flick_since is None:
+                    self._flick_since = now
 
                 norm_y = self._normalized_y(state.cursor[1])
                 if self._flick_prev_y is not None:
@@ -235,7 +255,7 @@ class GestureControlApp:
                     fired_recently = (
                         now - self._cooldowns.get(gesture_id, 0.0) < self.config.settings.action_cooldown
                     )
-                    if self._flick_armed and not fired_recently and velocity < -self.config.settings.flick_velocity:
+                    if self._flick_armed and not fired_recently and now - self._flick_since >= FLICK_ARM_DELAY and velocity < -self.config.settings.flick_velocity:
                         self.executor.scroll(spec.id, -self.config.settings.scroll_sensitivity)
                         self._flash("NEXT REEL")
                         self._cooldowns[gesture_id] = now

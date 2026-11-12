@@ -42,6 +42,8 @@ def _finger_extended(landmarks, wrist, pip_idx: int, tip_idx: int, factor: float
 class GestureState:
     cursor: tuple   # (x, y) normalized index-fingertip position
     active: dict    # gesture_id -> bool
+    wrist: tuple = (0.0, 0.0)
+    palm_size: float = 0.0
 
 
 def analyze(landmarks) -> GestureState:
@@ -86,6 +88,8 @@ def analyze(landmarks) -> GestureState:
 
     return GestureState(
         cursor=(landmarks[INDEX_TIP][0], landmarks[INDEX_TIP][1]),
+        wrist=(wrist[0], wrist[1]),
+        palm_size=palm_size,
         active={
             "thumbs_up": thumbs_up,
             "peace": peace,
