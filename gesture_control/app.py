@@ -38,6 +38,7 @@ class GestureControlApp:
 
         self.camera: Camera | None = None
         self.tracker: HandTracker | None = None
+        self._hand_seen = False
 
         # Last on-screen aim point, held from the most recent frame where the
         # index finger was actually extended (point/peace). Curling into
@@ -103,12 +104,18 @@ class GestureControlApp:
                 active = {g: False for g in GESTURE_IDS}
                 hand_present = False
 
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                result = self.tracker.process(rgb)
+                # Idle: only look for a hand on every 3rd frame (~100 ms pickup) to save CPU.
+                self._idle_frames = getattr(self, "_idle_frames", 0) + 1
+                if self._idle_frames % 3 and not self._hand_seen:
+                    landmarks = None
+                else:
+                    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    landmarks = self.tracker.process(rgb).multi_hand_landmarks
+                self._hand_seen = bool(landmarks)
 
-                if result.multi_hand_landmarks:
+                if landmarks:
                     hand_present = True
-                    hand_landmarks = result.multi_hand_landmarks[0]
+                    hand_landmarks = landmarks[0]
                     if self.show_landmarks:
                         self.tracker.draw(frame, hand_landmarks)
 
