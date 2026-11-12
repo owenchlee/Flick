@@ -53,6 +53,48 @@ def _display_label(action_id: str) -> str:
     return f"{spec.category}  ·  {spec.label}{suffix}"
 
 
+RING_BUTTON = {"border_width": 2, "border_color": theme.TEXT}
+
+
+def make_focusable(w, ring: dict):
+    """Give a CTk widget's canvas Tab focus, key activation and a focus ring.
+
+    ring maps configure() options to their focused values; the mouse-only look is restored on focus out.
+    """
+    canvas = w._canvas
+    canvas.configure(takefocus=1)
+
+    def step(sign):
+        lo, hi, n = w._from_, w._to, w._number_of_steps or 100
+        value = min(hi, max(lo, w.get() + sign * (hi - lo) / n))
+        w.set(value)
+        if w._command is not None:
+            w._command(value)
+
+    keys = {
+        "CTkButton": {k: lambda: w.invoke() for k in ("<Return>", "<space>")},
+        "CTkSwitch": {k: lambda: w.toggle() for k in ("<Return>", "<space>")},
+        "CTkOptionMenu": {k: (lambda: w._open_dropdown_menu()) for k in ("<Return>", "<space>", "<Down>", "<Up>")},
+        "CTkSlider": {"<Right>": lambda: step(1), "<Up>": lambda: step(1),
+                      "<Left>": lambda: step(-1), "<Down>": lambda: step(-1)},
+    }[type(w).__name__]
+    for key, fn in keys.items():
+        canvas.bind(key, lambda _e, fn=fn: (fn(), "break")[1])
+
+    saved = {}
+
+    def focus_in(_e):
+        saved.update({opt: w.cget(opt) for opt in ring})
+        w.configure(**ring)
+
+    def focus_out(_e):
+        if saved:
+            w.configure(**saved)
+
+    canvas.bind("<FocusIn>", focus_in)
+    canvas.bind("<FocusOut>", focus_out)
+
+
 class GestureRow(ctk.CTkFrame):
     def __init__(self, master, gesture_id: str, config: AppConfig, on_change):
         super().__init__(master, fg_color=theme.SURFACE, corner_radius=10)
@@ -94,6 +136,7 @@ class GestureRow(ctk.CTkFrame):
             text_color=theme.TEXT,
             width=230,
         )
+        make_focusable(self.menu, {"button_color": theme.BRAND_HOVER, "fg_color": theme.BORDER})
         self.menu.grid(row=0, column=2, rowspan=2, padx=(0, 10), pady=10, sticky="e")
 
         self.hotkey_var = ctk.StringVar(value=config.custom_hotkeys.get(gesture_id, ""))
@@ -154,6 +197,7 @@ class SliderRow(ctk.CTkFrame):
             command=self._on_slide, progress_color=theme.BRAND, button_color=theme.BRAND_HOVER,
             fg_color=theme.SURFACE_MUTED,
         )
+        make_focusable(self.slider, {"button_color": theme.TEXT})
         self.slider.set(value)
         self.slider.grid(row=2, column=0, sticky="ew", pady=(0, 18))
         self._is_int = is_int
@@ -215,6 +259,9 @@ class ConfiguratorApp(ctk.CTk):
         sensitivity_tab = self.tabs.add("Sensitivity")
         camera_tab = self.tabs.add("Camera")
         about_tab = self.tabs.add("About")
+
+        for btn in self.tabs._segmented_button._buttons_dict.values():
+            make_focusable(btn, RING_BUTTON)
 
         self._build_gestures_tab(gestures_tab)
         self._build_sensitivity_tab(sensitivity_tab)
@@ -288,6 +335,7 @@ class ConfiguratorApp(ctk.CTk):
                 row, text="", variable=var, progress_color=theme.BRAND, button_color=theme.TEXT,
                 command=self._mark_dirty,
             )
+            make_focusable(switch, {"button_color": theme.BRAND_HOVER})
             switch.pack(side="left")
             text_col = ctk.CTkFrame(row, fg_color="transparent")
             text_col.pack(side="left", padx=(10, 0))
@@ -343,6 +391,7 @@ class ConfiguratorApp(ctk.CTk):
             border_color=theme.DANGER, text_color=theme.DANGER, hover_color=theme.SURFACE_MUTED,
             command=self._reset_defaults,
         )
+        make_focusable(reset_btn, RING_BUTTON)
         reset_btn.pack(side="left")
 
         launch_btn = ctk.CTkButton(
@@ -350,6 +399,7 @@ class ConfiguratorApp(ctk.CTk):
             text_color=theme.BACKGROUND, font=(theme.UI_FONT_FAMILY, 13, "bold"),
             command=self._save_and_launch,
         )
+        make_focusable(launch_btn, RING_BUTTON)
         launch_btn.pack(side="right")
 
         save_btn = ctk.CTkButton(
@@ -357,6 +407,7 @@ class ConfiguratorApp(ctk.CTk):
             text_color=theme.TEXT, font=(theme.UI_FONT_FAMILY, 13, "bold"),
             command=self._save,
         )
+        make_focusable(save_btn, RING_BUTTON)
         save_btn.pack(side="right", padx=(0, 10))
 
     # ─── State ─────────────────────────────────────────────────────────
