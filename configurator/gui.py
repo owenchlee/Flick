@@ -185,8 +185,10 @@ class SliderRow(ctk.CTkFrame):
 
 class ConfiguratorApp(ctk.CTk):
     def __init__(self):
+        # Set the mode before the window exists so no widget needs a theme re-pass.
+        if ctk.get_appearance_mode() != "Dark":
+            ctk.set_appearance_mode("dark")
         super().__init__()
-        ctk.set_appearance_mode("dark")
 
         self.config = load_config()
         self._dirty = False
