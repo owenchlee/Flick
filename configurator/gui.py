@@ -237,7 +237,7 @@ class ConfiguratorApp(ctk.CTk):
         )
         intro.pack(fill="x", padx=4, pady=(10, 10))
 
-        scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        scroll = ctk.CTkFrame(tab, fg_color="transparent")
         scroll.pack(fill="both", expand=True)
 
         self.rows: dict[str, GestureRow] = {}
