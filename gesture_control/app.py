@@ -94,9 +94,6 @@ class GestureControlApp:
                 if self.config.settings.mirror:
                     frame = cv2.flip(frame, 1)
 
-                if self.show_grid:
-                    draw_grid(frame)
-
                 active = {g: False for g in GESTURE_IDS}
                 hand_present = False
 
@@ -122,6 +119,9 @@ class GestureControlApp:
                     self._flick_prev_y = None
                     self._flick_prev_t = None
                     self._flick_armed = True
+
+                if self.show_grid:
+                    draw_grid(frame)
 
                 self._update_fps()
                 draw_hud(
