@@ -76,6 +76,8 @@ class GestureControlApp:
         self._flick_prev_t = None
         self._flick_armed = True
         self._flick_since = None
+        self._flick_calm = 0.0
+        self._flick_moving = False
         self._flick_prev_wrist = None
 
     def _flash(self, text: str | None) -> None:
@@ -241,6 +243,7 @@ class GestureControlApp:
                 self._flick_prev_wrist = (wx, wy) if is_active else None
                 if not is_active or jumped:
                     self._flick_since = now if is_active else None
+                    self._flick_moving, self._flick_calm = False, 0.0
                     self._flick_prev_y = self._normalized_y(state.cursor[1]) if is_active else None
                     self._flick_prev_t = now if is_active else None
                     self._flick_armed = True
@@ -252,10 +255,17 @@ class GestureControlApp:
                 if self._flick_prev_y is not None:
                     dt = max(now - self._flick_prev_t, 1e-3)
                     velocity = (norm_y - self._flick_prev_y) / dt  # negative = moving up
+                    # calm = length of the still run before the current motion began
+                    if velocity > -self.config.settings.flick_velocity * 0.5:
+                        if self._flick_moving:
+                            self._flick_since, self._flick_moving = now, False
+                        self._flick_calm = now - self._flick_since
+                    else:
+                        self._flick_moving = True
                     fired_recently = (
                         now - self._cooldowns.get(gesture_id, 0.0) < self.config.settings.action_cooldown
                     )
-                    if self._flick_armed and not fired_recently and now - self._flick_since >= FLICK_ARM_DELAY and velocity < -self.config.settings.flick_velocity:
+                    if self._flick_armed and not fired_recently and self._flick_calm >= FLICK_ARM_DELAY and velocity < -self.config.settings.flick_velocity:
                         self.executor.scroll(spec.id, -self.config.settings.scroll_sensitivity)
                         self._flash("NEXT REEL")
                         self._cooldowns[gesture_id] = now
