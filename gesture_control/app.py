@@ -147,7 +147,7 @@ class GestureControlApp:
 
     # ─── Per-frame helpers ─────────────────────────────────────────────────
     def _handle_keys(self) -> bool:
-        key = cv2.waitKey(1) & 0xFF
+        key = cv2.pollKey() & 0xFF  # non-blocking; waitKey(1) stalls ~15 ms on Windows
         if key in (ord("q"), 27):
             return False
         if key == ord("g"):
