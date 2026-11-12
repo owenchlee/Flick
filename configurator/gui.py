@@ -13,6 +13,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tkinter import messagebox
+
 import customtkinter as ctk
 
 from gesture_control import theme
@@ -385,15 +387,38 @@ class ConfiguratorApp(ctk.CTk):
 
         return AppConfig(bindings=bindings, custom_hotkeys=custom_hotkeys, settings=settings)
 
-    def _save(self):
+    def _first_bad_hotkey(self) -> str | None:
+        """Name of the first gesture whose active custom hotkey the tracker cannot send."""
+        import keyboard  # same parser the tracker sends with
+
+        for g, row in self.rows.items():
+            if row.selected_action_id() != "custom_hotkey":
+                continue
+            try:
+                if not row.hotkey():
+                    raise ValueError("empty")
+                keyboard.parse_hotkey(row.hotkey())
+            except (ValueError, KeyError, TypeError):
+                return g
+        return None
+
+    def _save(self) -> bool:
+        bad = self._first_bad_hotkey()
+        if bad:
+            msg = f"Invalid custom hotkey for {bad}: '{self.rows[bad].hotkey()}'. Fix it, then save."
+            self.status_label.configure(text=msg, text_color=theme.DANGER)
+            messagebox.showerror("Invalid hotkey", msg)
+            return False
         self.config = self._collect_config()
         save_config(self.config)
         self._dirty = False
         self.status_label.configure(text="Saved ✓", text_color=theme.SUCCESS)
         self.after(2500, lambda: self.status_label.configure(text=""))
+        return True
 
     def _save_and_launch(self):
-        self._save()
+        if not self._save():
+            return
         subprocess.Popen([sys.executable, str(MAIN_PY)], cwd=str(MAIN_PY.parent))
         self.status_label.configure(text="Saved ✓ · Launching…", text_color=theme.SUCCESS)
 
