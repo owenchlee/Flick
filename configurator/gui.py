@@ -284,15 +284,13 @@ class ConfiguratorApp(ctk.CTk):
                 row, text="", variable=var, progress_color=theme.BRAND, button_color=theme.TEXT,
                 command=self._mark_dirty,
             )
-            switch.pack(side="left")
-            text_col = ctk.CTkFrame(row, fg_color="transparent")
-            text_col.pack(side="left", padx=(10, 0))
+            switch.grid(row=0, column=0, rowspan=2)
             ctk.CTkLabel(
-                text_col, text=label, font=(theme.UI_FONT_FAMILY, 13, "bold"), text_color=theme.TEXT, anchor="w",
-            ).pack(anchor="w")
+                row, text=label, font=(theme.UI_FONT_FAMILY, 13, "bold"), text_color=theme.TEXT, anchor="w",
+            ).grid(row=0, column=1, sticky="w", padx=(10, 0))
             ctk.CTkLabel(
-                text_col, text=desc, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
-            ).pack(anchor="w")
+                row, text=desc, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
+            ).grid(row=1, column=1, sticky="w", padx=(10, 0))
             self.switch_vars[key] = var
 
     def _build_about_tab(self, tab):
