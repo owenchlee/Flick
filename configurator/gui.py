@@ -301,34 +301,32 @@ class ConfiguratorApp(ctk.CTk):
 
         ctk.CTkLabel(
             wrap, text="Thumb-Detector", font=(theme.UI_FONT_FAMILY, 18, "bold"), text_color=theme.TEXT, anchor="w",
-        ).pack(fill="x")
+        ).grid(row=0, column=0, columnspan=2, sticky="ew")
         ctk.CTkLabel(
             wrap,
             text="Scroll and react to short-form video feeds — Reels, Shorts, TikTok — with hand gestures.",
             font=(theme.UI_FONT_FAMILY, 12), text_color=theme.TEXT_MUTED, anchor="w", justify="left",
-        ).pack(fill="x", pady=(4, 18))
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(4, 18))
 
         ctk.CTkLabel(
             wrap, text="Tracker window shortcuts", font=(theme.UI_FONT_FAMILY, 14, "bold"),
             text_color=theme.TEXT, anchor="w",
-        ).pack(fill="x", pady=(0, 6))
+        ).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 6))
 
-        for key, desc in [
+        for r, (key, desc) in enumerate([
             ("G", "Toggle the coordinate grid overlay"),
             ("L", "Toggle the hand-skeleton overlay"),
             ("R", "Reset cursor smoothing"),
             ("C", "Reload config.json without restarting"),
             ("Q / Esc", "Quit"),
-        ]:
-            row = ctk.CTkFrame(wrap, fg_color="transparent")
-            row.pack(fill="x", pady=2)
+        ], start=3):
             ctk.CTkLabel(
-                row, text=key, font=(theme.UI_FONT_FAMILY_MONO, 12, "bold"), text_color=theme.BRAND_HOVER, width=70,
+                wrap, text=key, font=(theme.UI_FONT_FAMILY_MONO, 12, "bold"), text_color=theme.BRAND_HOVER, width=70,
                 anchor="w",
-            ).pack(side="left")
+            ).grid(row=r, column=0, sticky="w", pady=2)
             ctk.CTkLabel(
-                row, text=desc, font=(theme.UI_FONT_FAMILY, 12), text_color=theme.TEXT_MUTED, anchor="w",
-            ).pack(side="left")
+                wrap, text=desc, font=(theme.UI_FONT_FAMILY, 12), text_color=theme.TEXT_MUTED, anchor="w",
+            ).grid(row=r, column=1, sticky="w", pady=2)
 
     def _build_footer(self):
         footer = ctk.CTkFrame(self, fg_color="transparent")
