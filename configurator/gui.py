@@ -231,6 +231,15 @@ class ConfiguratorApp(ctk.CTk):
 
         scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
         scroll.pack(fill="both", expand=True)
+        # skip scrollbar redraws when the thumb position did not change (each one redraws a canvas)
+        last = []
+
+        def _set_scrollbar(start, end, _set=scroll._scrollbar.set):
+            if last != [start, end]:
+                last[:] = [start, end]
+                _set(start, end)
+
+        scroll._parent_canvas.configure(yscrollcommand=_set_scrollbar)
 
         self.rows: dict[str, GestureRow] = {}
         for gesture_id in GESTURE_IDS:
