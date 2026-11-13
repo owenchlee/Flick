@@ -53,6 +53,21 @@ def _display_label(action_id: str) -> str:
     return f"{spec.category}  ·  {spec.label}{suffix}"
 
 
+class _DeferredSlider(ctk.CTkSlider):
+    """Redraw once the resizing pauses instead of on every Configure step."""
+
+    _resize_job = None
+
+    def _update_dimensions_event(self, event):
+        if self._resize_job is not None:
+            self.after_cancel(self._resize_job)
+        self._resize_job = self.after(150, self._redraw_after_resize, event)
+
+    def _redraw_after_resize(self, event):
+        self._resize_job = None
+        super()._update_dimensions_event(event)
+
+
 class GestureRow(ctk.CTkFrame):
     def __init__(self, master, gesture_id: str, config: AppConfig, on_change):
         super().__init__(master, fg_color=theme.SURFACE, corner_radius=10)
@@ -159,7 +174,7 @@ class SliderRow:
         ).grid(row=base + 1, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 6))
 
         steps = (hi - lo) if is_int else 100
-        self.slider = ctk.CTkSlider(
+        self.slider = _DeferredSlider(
             master, from_=lo, to=hi, number_of_steps=max(1, int(steps)),
             command=self._on_slide, progress_color=theme.BRAND, button_color=theme.BRAND_HOVER,
             fg_color=theme.SURFACE_MUTED,
