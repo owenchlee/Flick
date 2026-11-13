@@ -132,21 +132,17 @@ class SliderRow(ctk.CTkFrame):
 
         self.grid_columnconfigure(0, weight=1)
 
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew")
-        header.grid_columnconfigure(0, weight=1)
-
         ctk.CTkLabel(
-            header, text=title, font=(theme.UI_FONT_FAMILY, 14, "bold"), text_color=theme.TEXT, anchor="w",
+            self, text=title, font=(theme.UI_FONT_FAMILY, 14, "bold"), text_color=theme.TEXT, anchor="w",
         ).grid(row=0, column=0, sticky="w")
         self.value_label = ctk.CTkLabel(
-            header, text=fmt(value), font=(theme.UI_FONT_FAMILY_MONO, 13), text_color=theme.BRAND_HOVER,
+            self, text=fmt(value), font=(theme.UI_FONT_FAMILY_MONO, 13), text_color=theme.BRAND_HOVER,
         )
         self.value_label.grid(row=0, column=1, sticky="e")
 
         ctk.CTkLabel(
             self, text=description, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
-        ).grid(row=1, column=0, sticky="w", pady=(0, 6))
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 6))
 
         steps = (hi - lo) if is_int else 100
         self.slider = ctk.CTkSlider(
@@ -155,7 +151,7 @@ class SliderRow(ctk.CTkFrame):
             fg_color=theme.SURFACE_MUTED,
         )
         self.slider.set(value)
-        self.slider.grid(row=2, column=0, sticky="ew", pady=(0, 18))
+        self.slider.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 18))
         self._is_int = is_int
 
     def _on_slide(self, value):
