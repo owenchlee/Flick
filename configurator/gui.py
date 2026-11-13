@@ -121,37 +121,40 @@ class GestureRow(ctk.CTkFrame):
         return self.hotkey_var.get().strip()
 
 
-class SliderRow(ctk.CTkFrame):
-    def __init__(self, master, key: str, title: str, description: str, value, fmt, on_change):
-        super().__init__(master, fg_color="transparent")
+class SliderRow:
+    """Title/value/description/slider gridded straight into `master` (rows base..base+2).
+
+    Not a CTkFrame: each frame is a canvas that redraws on every resize.
+    """
+
+    def __init__(self, master, base: int, key: str, title: str, description: str, value, fmt, on_change):
         self.key = key
         self.fmt = fmt
         self.on_change = on_change
         lo, hi, _default = SETTINGS_RANGES[key]
         is_int = isinstance(value, int)
-
-        self.grid_columnconfigure(0, weight=1)
+        top = 16 if base == 0 else 0
 
         ctk.CTkLabel(
-            self, text=title, font=(theme.UI_FONT_FAMILY, 14, "bold"), text_color=theme.TEXT, anchor="w",
-        ).grid(row=0, column=0, sticky="w")
+            master, text=title, font=(theme.UI_FONT_FAMILY, 14, "bold"), text_color=theme.TEXT, anchor="w",
+        ).grid(row=base, column=0, sticky="w", padx=(6, 0), pady=(top, 0))
         self.value_label = ctk.CTkLabel(
-            self, text=fmt(value), font=(theme.UI_FONT_FAMILY_MONO, 13), text_color=theme.BRAND_HOVER,
+            master, text=fmt(value), font=(theme.UI_FONT_FAMILY_MONO, 13), text_color=theme.BRAND_HOVER,
         )
-        self.value_label.grid(row=0, column=1, sticky="e")
+        self.value_label.grid(row=base, column=1, sticky="e", padx=(0, 6), pady=(top, 0))
 
         ctk.CTkLabel(
-            self, text=description, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
-        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 6))
+            master, text=description, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
+        ).grid(row=base + 1, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 6))
 
         steps = (hi - lo) if is_int else 100
         self.slider = ctk.CTkSlider(
-            self, from_=lo, to=hi, number_of_steps=max(1, int(steps)),
+            master, from_=lo, to=hi, number_of_steps=max(1, int(steps)),
             command=self._on_slide, progress_color=theme.BRAND, button_color=theme.BRAND_HOVER,
             fg_color=theme.SURFACE_MUTED,
         )
         self.slider.set(value)
-        self.slider.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 18))
+        self.slider.grid(row=base + 2, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 18))
         self._is_int = is_int
 
     def _on_slide(self, value):
@@ -237,6 +240,7 @@ class ConfiguratorApp(ctk.CTk):
 
     def _build_sensitivity_tab(self, tab):
         wrap = tab  # no grouping frame: each CTkFrame is a canvas that redraws on resize
+        wrap.grid_columnconfigure(0, weight=1)
 
         settings = self.config.settings
         self.sliders: dict[str, SliderRow] = {}
@@ -249,9 +253,9 @@ class ConfiguratorApp(ctk.CTk):
             ("flick_velocity", "Flick sensitivity", "Lower = a gentler finger flick triggers the next reel.", lambda v: f"{v:.2f}"),
         ]
         for i, (key, title, desc, fmt) in enumerate(specs):
-            row = SliderRow(wrap, key, title, desc, getattr(settings, key), fmt, on_change=self._mark_dirty)
-            row.pack(fill="x", padx=6, pady=(16, 0) if i == 0 else 0)
-            self.sliders[key] = row
+            self.sliders[key] = SliderRow(
+                wrap, 3 * i, key, title, desc, getattr(settings, key), fmt, on_change=self._mark_dirty,
+            )
 
     def _build_camera_tab(self, tab):
         wrap = tab  # no grouping frames: each CTkFrame is a canvas that redraws on resize
