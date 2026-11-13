@@ -173,7 +173,10 @@ class GestureControlApp:
             margin_y = FRAME_H * self.config.settings.cursor_margin
 
             mapped_x = np.interp(state.cursor[0] * FRAME_W, [margin_x, FRAME_W - margin_x], [0, self.screen_w])
-            mapped_y = np.interp(state.cursor[1] * FRAME_H, [margin_y, FRAME_H - margin_y], [0, self.screen_h])
+            # The wrist must stay in frame, so the fingertip can't get lower than
+            # FRAME_H - (wrist-to-tip drop); pull the bottom bound up to that.
+            bottom_y = max(margin_y + FRAME_H * 0.25, min(FRAME_H - margin_y, FRAME_H * (1 - state.reach)))  # floor keeps interp sane
+            mapped_y = np.interp(state.cursor[1] * FRAME_H, [margin_y, bottom_y], [0, self.screen_h])
             mapped_x = np.clip(mapped_x, 0, self.screen_w)
             mapped_y = np.clip(mapped_y, 0, self.screen_h)
 
