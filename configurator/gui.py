@@ -234,8 +234,7 @@ class ConfiguratorApp(ctk.CTk):
             self.rows[gesture_id] = row
 
     def _build_sensitivity_tab(self, tab):
-        wrap = ctk.CTkFrame(tab, fg_color="transparent")
-        wrap.pack(fill="both", expand=True, padx=6, pady=16)
+        wrap = tab  # no grouping frame: each CTkFrame is a canvas that redraws on resize
 
         settings = self.config.settings
         self.sliders: dict[str, SliderRow] = {}
@@ -247,28 +246,27 @@ class ConfiguratorApp(ctk.CTk):
             ("scroll_sensitivity", "Scroll sensitivity", "How far each next/previous flick scrolls.", lambda v: f"{v}"),
             ("flick_velocity", "Flick sensitivity", "Lower = a gentler finger flick triggers the next reel.", lambda v: f"{v:.2f}"),
         ]
-        for key, title, desc, fmt in specs:
+        for i, (key, title, desc, fmt) in enumerate(specs):
             row = SliderRow(wrap, key, title, desc, getattr(settings, key), fmt, on_change=self._mark_dirty)
-            row.pack(fill="x")
+            row.pack(fill="x", padx=6, pady=(16, 0) if i == 0 else 0)
             self.sliders[key] = row
 
     def _build_camera_tab(self, tab):
-        wrap = ctk.CTkFrame(tab, fg_color="transparent")
-        wrap.pack(fill="both", expand=True, padx=6, pady=16)
+        wrap = tab  # no grouping frame: each CTkFrame is a canvas that redraws on resize
 
         ctk.CTkLabel(
             wrap, text="Camera index", font=(theme.UI_FONT_FAMILY, 14, "bold"), text_color=theme.TEXT, anchor="w",
-        ).pack(fill="x", pady=(0, 4))
+        ).pack(fill="x", padx=6, pady=(16, 4))
         ctk.CTkLabel(
             wrap, text="Which webcam to use, if you have more than one (0 is usually the default camera).",
             font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
-        ).pack(fill="x", pady=(0, 8))
+        ).pack(fill="x", padx=6, pady=(0, 8))
         self.camera_index_var = ctk.StringVar(value=str(self.config.settings.camera_index))
         camera_entry = ctk.CTkEntry(
             wrap, textvariable=self.camera_index_var, width=80,
             fg_color=theme.SURFACE_MUTED, border_color=theme.BORDER, text_color=theme.TEXT,
         )
-        camera_entry.pack(anchor="w", pady=(0, 20))
+        camera_entry.pack(anchor="w", padx=6, pady=(0, 20))
         self.camera_index_var.trace_add("write", lambda *_: self._mark_dirty())
 
         self.switch_vars: dict[str, ctk.BooleanVar] = {}
@@ -278,7 +276,7 @@ class ConfiguratorApp(ctk.CTk):
             ("show_grid", "Show coordinate grid", "Overlay a grid for debugging tracking."),
         ]:
             row = ctk.CTkFrame(wrap, fg_color="transparent")
-            row.pack(fill="x", pady=6)
+            row.pack(fill="x", padx=6, pady=6)
             var = ctk.BooleanVar(value=getattr(self.config.settings, key))
             switch = ctk.CTkSwitch(
                 row, text="", variable=var, progress_color=theme.BRAND, button_color=theme.TEXT,
@@ -294,22 +292,21 @@ class ConfiguratorApp(ctk.CTk):
             self.switch_vars[key] = var
 
     def _build_about_tab(self, tab):
-        wrap = ctk.CTkFrame(tab, fg_color="transparent")
-        wrap.pack(fill="both", expand=True, padx=6, pady=16)
+        wrap = tab  # no grouping frame: each CTkFrame is a canvas that redraws on resize
 
         ctk.CTkLabel(
             wrap, text="Thumb-Detector", font=(theme.UI_FONT_FAMILY, 18, "bold"), text_color=theme.TEXT, anchor="w",
-        ).grid(row=0, column=0, columnspan=2, sticky="ew")
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", padx=6, pady=(16, 0))
         ctk.CTkLabel(
             wrap,
             text="Scroll and react to short-form video feeds — Reels, Shorts, TikTok — with hand gestures.",
             font=(theme.UI_FONT_FAMILY, 12), text_color=theme.TEXT_MUTED, anchor="w", justify="left",
-        ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(4, 18))
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(4, 18))
 
         ctk.CTkLabel(
             wrap, text="Tracker window shortcuts", font=(theme.UI_FONT_FAMILY, 14, "bold"),
             text_color=theme.TEXT, anchor="w",
-        ).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+        ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 6))
 
         for r, (key, desc) in enumerate([
             ("G", "Toggle the coordinate grid overlay"),
@@ -321,10 +318,10 @@ class ConfiguratorApp(ctk.CTk):
             ctk.CTkLabel(
                 wrap, text=key, font=(theme.UI_FONT_FAMILY_MONO, 12, "bold"), text_color=theme.BRAND_HOVER, width=70,
                 anchor="w",
-            ).grid(row=r, column=0, sticky="w", pady=2)
+            ).grid(row=r, column=0, sticky="w", padx=6, pady=2)
             ctk.CTkLabel(
                 wrap, text=desc, font=(theme.UI_FONT_FAMILY, 12), text_color=theme.TEXT_MUTED, anchor="w",
-            ).grid(row=r, column=1, sticky="w", pady=2)
+            ).grid(row=r, column=1, sticky="w", padx=6, pady=2)
 
     def _build_footer(self):
         footer = ctk.CTkFrame(self, fg_color="transparent")
