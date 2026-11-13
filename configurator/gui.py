@@ -177,8 +177,11 @@ class ConfiguratorApp(ctk.CTk):
         self._dirty = False
 
         self.title("Thumb-Detector — Configurator")
-        self.geometry("880x680")
-        self.minsize(760, 560)
+        # Leave room for the taskbar and title bar on small screens.
+        w = min(880, self.winfo_screenwidth() - 40)
+        h = min(680, self.winfo_screenheight() - 120)
+        self.geometry(f"{w}x{h}")
+        self.minsize(min(760, w), min(560, h))
         self.configure(fg_color=theme.BACKGROUND)
 
         self._build_header()
@@ -238,7 +241,7 @@ class ConfiguratorApp(ctk.CTk):
             self.rows[gesture_id] = row
 
     def _build_sensitivity_tab(self, tab):
-        wrap = ctk.CTkFrame(tab, fg_color="transparent")
+        wrap = ctk.CTkScrollableFrame(tab, fg_color="transparent")
         wrap.pack(fill="both", expand=True, padx=6, pady=16)
 
         settings = self.config.settings
