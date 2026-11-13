@@ -252,43 +252,43 @@ class ConfiguratorApp(ctk.CTk):
             self.sliders[key] = row
 
     def _build_camera_tab(self, tab):
-        wrap = tab  # no grouping frame: each CTkFrame is a canvas that redraws on resize
+        wrap = tab  # no grouping frames: each CTkFrame is a canvas that redraws on resize
+        wrap.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
             wrap, text="Camera index", font=(theme.UI_FONT_FAMILY, 14, "bold"), text_color=theme.TEXT, anchor="w",
-        ).pack(fill="x", padx=6, pady=(16, 4))
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", padx=6, pady=(16, 4))
         ctk.CTkLabel(
             wrap, text="Which webcam to use, if you have more than one (0 is usually the default camera).",
             font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
-        ).pack(fill="x", padx=6, pady=(0, 8))
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 8))
         self.camera_index_var = ctk.StringVar(value=str(self.config.settings.camera_index))
         camera_entry = ctk.CTkEntry(
             wrap, textvariable=self.camera_index_var, width=80,
             fg_color=theme.SURFACE_MUTED, border_color=theme.BORDER, text_color=theme.TEXT,
         )
-        camera_entry.pack(anchor="w", padx=6, pady=(0, 20))
+        camera_entry.grid(row=2, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 20))
         self.camera_index_var.trace_add("write", lambda *_: self._mark_dirty())
 
         self.switch_vars: dict[str, ctk.BooleanVar] = {}
-        for key, label, desc in [
+        for i, (key, label, desc) in enumerate([
             ("mirror", "Mirror the camera feed", "Flip horizontally so it acts like a mirror."),
             ("show_landmarks", "Show hand skeleton", "Draw the tracked hand landmarks on screen."),
             ("show_grid", "Show coordinate grid", "Overlay a grid for debugging tracking."),
-        ]:
-            row = ctk.CTkFrame(wrap, fg_color="transparent")
-            row.pack(fill="x", padx=6, pady=6)
+        ]):
+            r = 3 + 2 * i
             var = ctk.BooleanVar(value=getattr(self.config.settings, key))
             switch = ctk.CTkSwitch(
-                row, text="", variable=var, progress_color=theme.BRAND, button_color=theme.TEXT,
+                wrap, text="", variable=var, progress_color=theme.BRAND, button_color=theme.TEXT,
                 command=self._mark_dirty,
             )
-            switch.grid(row=0, column=0, rowspan=2)
+            switch.grid(row=r, column=0, rowspan=2, padx=(6, 0), pady=6, sticky="w")
             ctk.CTkLabel(
-                row, text=label, font=(theme.UI_FONT_FAMILY, 13, "bold"), text_color=theme.TEXT, anchor="w",
-            ).grid(row=0, column=1, sticky="w", padx=(10, 0))
+                wrap, text=label, font=(theme.UI_FONT_FAMILY, 13, "bold"), text_color=theme.TEXT, anchor="w",
+            ).grid(row=r, column=1, sticky="ew", padx=(10, 6), pady=(6, 0))
             ctk.CTkLabel(
-                row, text=desc, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
-            ).grid(row=1, column=1, sticky="w", padx=(10, 0))
+                wrap, text=desc, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
+            ).grid(row=r + 1, column=1, sticky="ew", padx=(10, 6), pady=(0, 6))
             self.switch_vars[key] = var
 
     def _build_about_tab(self, tab):
