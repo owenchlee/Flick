@@ -56,6 +56,7 @@ def _display_label(action_id: str) -> str:
 class GestureRow(ctk.CTkFrame):
     def __init__(self, master, gesture_id: str, config: AppConfig, on_change):
         super().__init__(master, fg_color=theme.SURFACE, corner_radius=10)
+        self._resize_job = None
         self.gesture_id = gesture_id
         self.on_change = on_change
         self._label_to_id = {_display_label(a): a for a in _action_choices()}
@@ -103,6 +104,16 @@ class GestureRow(ctk.CTkFrame):
         )
         self.hotkey_var.trace_add("write", lambda *_: self.on_change())
         self._place_hotkey_entry()
+
+    def _update_dimensions_event(self, event):
+        # a drag-resize fires this per step; redraw the rounded rect once the resizing pauses
+        if self._resize_job is not None:
+            self.after_cancel(self._resize_job)
+        self._resize_job = self.after(150, self._redraw_after_resize, event)
+
+    def _redraw_after_resize(self, event):
+        self._resize_job = None
+        super()._update_dimensions_event(event)
 
     def _place_hotkey_entry(self):
         if self.selected_action_id() == "custom_hotkey":
