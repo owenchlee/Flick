@@ -183,21 +183,23 @@ class ConfiguratorApp(ctk.CTk):
 
     # ─── Layout ─────────────────────────────────────────────────────────
     def _build_header(self):
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=28, pady=(24, 8))
+        # header/tabs/footer share one grid on the root: no grouping frames (each is a redrawing canvas)
+        header = self
+        self.grid_columnconfigure(2, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
         title = ctk.CTkLabel(
             header, text="THUMB-DETECTOR", font=(theme.UI_FONT_FAMILY, 22, "bold"), text_color=theme.TEXT,
         )
-        title.pack(side="left")
+        title.grid(row=0, column=0, sticky="w", padx=(28, 0), pady=(24, 8))
         badge = ctk.CTkLabel(
             header, text="CONFIGURATOR", font=(theme.UI_FONT_FAMILY, 12, "bold"),
             text_color=theme.BACKGROUND, fg_color=theme.BRAND, corner_radius=6, padx=8, pady=3,
         )
-        badge.pack(side="left", padx=(10, 0))
+        badge.grid(row=0, column=1, sticky="w", padx=(10, 0), pady=(24, 8))
 
         self.status_label = ctk.CTkLabel(header, text="", font=(theme.UI_FONT_FAMILY, 12), text_color=theme.SUCCESS)
-        self.status_label.pack(side="right")
+        self.status_label.grid(row=0, column=3, columnspan=2, sticky="e", padx=(0, 28), pady=(24, 8))
 
     def _build_tabs(self):
         self.tabs = ctk.CTkTabview(
@@ -205,7 +207,7 @@ class ConfiguratorApp(ctk.CTk):
             segmented_button_selected_hover_color=theme.BRAND_HOVER,
             segmented_button_unselected_color=theme.SURFACE_MUTED, text_color=theme.TEXT,
         )
-        self.tabs.pack(fill="both", expand=True, padx=28, pady=8)
+        self.tabs.grid(row=1, column=0, columnspan=5, sticky="nsew", padx=28, pady=8)
 
         gestures_tab = self.tabs.add("Gestures")
         sensitivity_tab = self.tabs.add("Sensitivity")
@@ -324,29 +326,28 @@ class ConfiguratorApp(ctk.CTk):
             ).grid(row=r, column=1, sticky="w", padx=6, pady=2)
 
     def _build_footer(self):
-        footer = ctk.CTkFrame(self, fg_color="transparent")
-        footer.pack(fill="x", padx=28, pady=(8, 24))
+        footer = self
 
         reset_btn = ctk.CTkButton(
             footer, text="Reset to Defaults", fg_color="transparent", border_width=1,
             border_color=theme.DANGER, text_color=theme.DANGER, hover_color=theme.SURFACE_MUTED,
             command=self._reset_defaults,
         )
-        reset_btn.pack(side="left")
+        reset_btn.grid(row=2, column=0, sticky="w", padx=(28, 0), pady=(8, 24))
 
         launch_btn = ctk.CTkButton(
             footer, text="Save & Launch", fg_color=theme.SUCCESS, hover_color="#16A34A",
             text_color=theme.BACKGROUND, font=(theme.UI_FONT_FAMILY, 13, "bold"),
             command=self._save_and_launch,
         )
-        launch_btn.pack(side="right")
+        launch_btn.grid(row=2, column=4, sticky="e", padx=(0, 28), pady=(8, 24))
 
         save_btn = ctk.CTkButton(
             footer, text="Save", fg_color=theme.BRAND, hover_color=theme.BRAND_HOVER,
             text_color=theme.TEXT, font=(theme.UI_FONT_FAMILY, 13, "bold"),
             command=self._save,
         )
-        save_btn.pack(side="right", padx=(0, 10))
+        save_btn.grid(row=2, column=3, sticky="e", padx=(0, 10), pady=(8, 24))
 
     # ─── State ─────────────────────────────────────────────────────────
     def _mark_dirty(self):
