@@ -468,7 +468,28 @@ class ConfiguratorApp(ctk.CTk):
 
         return AppConfig(bindings=bindings, custom_hotkeys=custom_hotkeys, settings=settings)
 
-    def _save(self):
+    def _first_bad_hotkey(self) -> str | None:
+        """Name of the first gesture whose active custom hotkey the tracker cannot send."""
+        import keyboard  # same parser the tracker sends with
+
+        for g, row in self.rows.items():
+            if row.selected_action_id() != "custom_hotkey":
+                continue
+            try:
+                if not row.hotkey():
+                    raise ValueError("empty")
+                keyboard.parse_hotkey(row.hotkey())
+            except (ValueError, KeyError, TypeError):
+                return g
+        return None
+
+    def _save(self) -> bool:
+        bad = self._first_bad_hotkey()
+        if bad:
+            msg = f"Invalid custom hotkey for {bad}: '{self.rows[bad].hotkey()}'. Fix it, then save."
+            self.status_label.configure(text=msg, text_color=theme.DANGER)
+            messagebox.showerror("Invalid hotkey", msg)
+            return False
         self.config = self._collect_config()
         if not _write_config(self):
             return False
