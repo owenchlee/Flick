@@ -55,6 +55,7 @@ SETTINGS_RANGES = {
 class Settings:
     camera_index: int = 0
     mirror: bool = True
+    move_cursor: bool = True
     show_landmarks: bool = True
     show_grid: bool = False
     smoothing: int = SETTINGS_RANGES["smoothing"][2]
@@ -64,7 +65,7 @@ class Settings:
     flick_velocity: float = SETTINGS_RANGES["flick_velocity"][2]
 
     def clamp(self) -> None:
-        for name in ("mirror", "show_landmarks", "show_grid"):
+        for name in ("mirror", "move_cursor", "show_landmarks", "show_grid"):
             if not isinstance(getattr(self, name), bool):
                 setattr(self, name, type(self).__dataclass_fields__[name].default)
         cam = self.camera_index

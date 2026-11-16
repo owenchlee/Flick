@@ -24,11 +24,16 @@ from .hand_tracker import Camera, HandTracker
 from .overlay import draw_cursor, draw_grid, draw_hud
 from .smoother import OneEuroSmoother
 
-WINDOW_TITLE = "Thumb-Detector"
+WINDOW_TITLE = "Flick"
 FRAME_W, FRAME_H = 640, 480
-DEBOUNCE_S = 0.08  # pose must persist this long (and >= 2 frames) before acting
-REARM_S = 0.1  # pose must be off this long before an instant action can re-fire
+DEBOUNCE_S = 0.08  # hold actions: pose must persist this long (and >= 2 frames) before acting
 HOLD_GRACE_S = 0.18  # tolerate tracking dropouts/misreads while a hold is down
+
+# Instant gestures (like, comments, ...) must be held this many consecutive
+# frames before firing, and released this many before they can fire again.
+# Filters the pose flicker a hand makes while curling at the end of a flick.
+HOLD_FRAMES = 3
+RELEASE_FRAMES = 5
 
 
 class GestureControlApp:
@@ -67,12 +72,20 @@ class GestureControlApp:
         self._fps_started = time.monotonic()
 
         self._cooldowns = {gesture_id: 0.0 for gesture_id in GESTURE_IDS}
-        self._edge: dict = {}
         self._hold: dict = {}
         # State for the point-driven "flick up to advance" scroll gesture —
         # see _dispatch's "scroll" branch.
         self._flick_hist = deque()
         self._flick_armed = True
+        # Per-gesture state for instant actions: a pose must be held for
+        # HOLD_FRAMES before it fires, fires once, and only re-arms after
+        # RELEASE_FRAMES of not being held.
+        self._reset_instant_state()
+
+    def _reset_instant_state(self) -> None:
+        self._held_frames = {gesture_id: 0 for gesture_id in GESTURE_IDS}
+        self._idle_frames = {gesture_id: 0 for gesture_id in GESTURE_IDS}
+        self._latched = {gesture_id: False for gesture_id in GESTURE_IDS}
 
     def _flash(self, text: str | None) -> None:
         if not text:
@@ -151,6 +164,7 @@ class GestureControlApp:
                     self._dispatch(state)
                 else:
                     self._tick_holds_no_hand()
+                    self._reset_instant_state()
                     self.smoother.reset()
                     self._cursor_history.clear()
                     self._flick_hist.clear()
@@ -194,7 +208,7 @@ class GestureControlApp:
             self.config = load_config()
             self.executor.release_all_holds()
             self._hold.clear()
-            self._edge.clear()
+            self._reset_instant_state()
             self.smoother.resize(self.config.settings.smoothing)
             self._flash("CONFIG RELOADED")
         return True
@@ -226,7 +240,8 @@ class GestureControlApp:
             mapped_y = np.clip(mapped_y, 0, self.screen_h)
 
             sx, sy = self.smoother.smooth((mapped_x, mapped_y))
-            self._move_cursor(sx, sy)
+            if self.config.settings.move_cursor:
+                self._move_cursor(sx, sy)
             frame_px = (int(state.cursor[0] * FRAME_W), int(state.cursor[1] * FRAME_H))
             self._cursor_frame_px = frame_px
             self._cursor_history.append((frame_px, (sx, sy)))
@@ -237,7 +252,8 @@ class GestureControlApp:
             # not wherever the fingertip drifted to mid-curl.
             pre_curl_frame_px, pre_curl_screen_xy = self._cursor_history[0]
             self._cursor_frame_px = pre_curl_frame_px
-            self._move_cursor(*pre_curl_screen_xy)
+            if self.config.settings.move_cursor:
+                self._move_cursor(*pre_curl_screen_xy)
             self._cursor_history.clear()
 
         if self._cursor_frame_px is not None:
@@ -300,27 +316,25 @@ class GestureControlApp:
 
                 continue
 
-            # Rising edge only: the pose must persist (debounce) and must have
-            # been off for a while before it can fire again.
-            st = self._edge.setdefault(gesture_id, {"on": None, "frames": 0, "off": None, "fired": False})
+            # Rising edge only: the pose must be
+            # held HOLD_FRAMES before it fires, and off RELEASE_FRAMES before
+            # it can fire again.
             if not is_active:
-                if st["on"] is not None:
-                    if st["off"] is None:
-                        st["off"] = now
-                    if not st["fired"] or now - st["off"] >= REARM_S:
-                        st.update(on=None, frames=0, off=None, fired=False)
+                self._held_frames[gesture_id] = 0
+                self._idle_frames[gesture_id] += 1
+                if self._idle_frames[gesture_id] >= RELEASE_FRAMES:
+                    self._latched[gesture_id] = False
                 continue
-            st["off"] = None
-            if st["on"] is None:
-                st["on"] = now
-            st["frames"] += 1
-            if st["fired"] or st["frames"] < 2 or now - st["on"] < DEBOUNCE_S:
+
+            self._idle_frames[gesture_id] = 0
+            self._held_frames[gesture_id] += 1
+            if self._latched[gesture_id] or self._held_frames[gesture_id] < HOLD_FRAMES:
                 continue
-            st["fired"] = True
 
             if now - self._cooldowns.get(gesture_id, 0.0) < self.config.settings.action_cooldown:
                 continue
 
+            self._latched[gesture_id] = True
             custom_hotkey = self.config.custom_hotkeys.get(gesture_id, "")
             scroll_amount = self.config.settings.scroll_sensitivity if spec.id == SCROLL_PREV else 0
             self._flash(self.executor.fire(spec.id, custom_hotkey=custom_hotkey, scroll_amount=scroll_amount))

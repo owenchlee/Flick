@@ -223,7 +223,7 @@ class ConfiguratorApp(ctk.CTk):
         self._proc = None
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        self.title("Thumb-Detector — Configurator")
+        self.title("Flick — Configurator")
         # Leave room for the taskbar and title bar on small screens.
         w = min(880, self.winfo_screenwidth() - 40)
         h = min(680, self.winfo_screenheight() - 120)
@@ -241,7 +241,7 @@ class ConfiguratorApp(ctk.CTk):
         header.pack(fill="x", padx=28, pady=(24, 8))
 
         title = ctk.CTkLabel(
-            header, text="THUMB-DETECTOR", font=(theme.UI_FONT_FAMILY, 22, "bold"), text_color=theme.TEXT,
+            header, text="FLICK", font=(theme.UI_FONT_FAMILY, 22, "bold"), text_color=theme.TEXT,
         )
         title.pack(side="left")
         badge = ctk.CTkLabel(
@@ -331,6 +331,7 @@ class ConfiguratorApp(ctk.CTk):
         self.switch_vars: dict[str, ctk.BooleanVar] = {}
         for key, label, desc in [
             ("mirror", "Mirror the camera feed", "Flip horizontally so it acts like a mirror."),
+            ("move_cursor", "Move the mouse with my hand", "Off: the mouse stays put, so scrolls and clicks land where you left it."),
             ("show_landmarks", "Show hand skeleton", "Draw the tracked hand landmarks on screen."),
             ("show_grid", "Show coordinate grid", "Overlay a grid for debugging tracking."),
         ]:
@@ -358,7 +359,7 @@ class ConfiguratorApp(ctk.CTk):
         wrap.pack(fill="both", expand=True, padx=6, pady=16)
 
         ctk.CTkLabel(
-            wrap, text="Thumb-Detector", font=(theme.UI_FONT_FAMILY, 18, "bold"), text_color=theme.TEXT, anchor="w",
+            wrap, text="Flick", font=(theme.UI_FONT_FAMILY, 18, "bold"), text_color=theme.TEXT, anchor="w",
         ).pack(fill="x")
         ctk.CTkLabel(
             wrap,
@@ -432,6 +433,7 @@ class ConfiguratorApp(ctk.CTk):
         for key, slider in self.sliders.items():
             setattr(settings, key, slider.value())
         settings.mirror = self.switch_vars["mirror"].get()
+        settings.move_cursor = self.switch_vars["move_cursor"].get()
         settings.show_landmarks = self.switch_vars["show_landmarks"].get()
         settings.show_grid = self.switch_vars["show_grid"].get()
         try:
