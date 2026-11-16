@@ -84,10 +84,23 @@ class GestureControlApp:
         self.camera.warm_up()
         self.tracker.wait_until_ready()
 
+        if not self.camera.is_opened():
+            index = self.config.settings.camera_index
+            self.camera.release()
+            raise RuntimeError(
+                f"Could not open camera {index}. Close other apps using it, or pick another "
+                "camera index in the configurator."
+            )
+
+        tracker_error_reported = False
         try:
             while self.camera.is_opened():
                 ok, frame = self.camera.read()
-                if not ok:
+                if not ok or frame is None:
+                    # Keep keys responsive and avoid a 100% CPU spin on a dead read.
+                    if not self._handle_keys():
+                        break
+                    time.sleep(0.02)
                     continue
 
                 if self.config.settings.mirror:
@@ -103,16 +116,30 @@ class GestureControlApp:
                 hand_present = False
 
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                result = self.tracker.process(rgb)
+                try:
+                    result = self.tracker.process(rgb)
+                except RuntimeError as exc:
+                    # One bad frame must not kill the app: treat it as "no hand".
+                    result = None
+                    if not tracker_error_reported:
+                        print(f"Hand tracker failed on a frame ({exc}); continuing.")
+                        tracker_error_reported = True
 
-                if result.multi_hand_landmarks:
-                    hand_present = True
+                state = None
+                if result is not None and result.multi_hand_landmarks:
                     hand_landmarks = result.multi_hand_landmarks[0]
+                    try:
+                        state = analyze(HandTracker.to_points(hand_landmarks))
+                    except ValueError as exc:
+                        # Partial landmark list from the tracker: treat as "no hand".
+                        if not tracker_error_reported:
+                            print(f"Bad landmarks from tracker ({exc}); continuing.")
+                            tracker_error_reported = True
+
+                if state is not None:
+                    hand_present = True
                     if self.show_landmarks:
                         self.tracker.draw(frame, hand_landmarks)
-
-                    points = HandTracker.to_points(hand_landmarks)
-                    state = analyze(points)
                     active = state.active
 
                     self._drive_cursor(frame, state)
@@ -137,6 +164,9 @@ class GestureControlApp:
 
                 cv2.imshow(WINDOW_TITLE, frame)
                 cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 1)
+                # The X button hides the window but imshow would re-create it: quit instead.
+                if cv2.getWindowProperty(WINDOW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
+                    break
         finally:
             self.executor.release_all_holds()
             if self.camera:
@@ -161,6 +191,15 @@ class GestureControlApp:
             self._flash("CONFIG RELOADED")
         return True
 
+    def _move_cursor(self, x, y) -> None:
+        # UAC / secure desktop / locked screen make moveTo fail: skip, don't crash.
+        try:
+            pyautogui.moveTo(x, y)
+        except (OSError, pyautogui.PyAutoGUIException) as exc:
+            if not getattr(self, "_move_error_reported", False):
+                print(f"Cannot move the cursor ({exc}); continuing.")
+                self._move_error_reported = True
+
     def _drive_cursor(self, frame, state) -> None:
         # Only track/move while the index finger is actually extended
         # (point or peace) — thumbs_up/fist curl it toward the palm, and
@@ -176,7 +215,7 @@ class GestureControlApp:
             mapped_y = np.clip(mapped_y, 0, self.screen_h)
 
             sx, sy = self.smoother.smooth((mapped_x, mapped_y))
-            pyautogui.moveTo(sx, sy)
+            self._move_cursor(sx, sy)
             frame_px = (int(state.cursor[0] * FRAME_W), int(state.cursor[1] * FRAME_H))
             self._cursor_frame_px = frame_px
             self._cursor_history.append((frame_px, (sx, sy)))
@@ -187,7 +226,7 @@ class GestureControlApp:
             # not wherever the fingertip drifted to mid-curl.
             pre_curl_frame_px, pre_curl_screen_xy = self._cursor_history[0]
             self._cursor_frame_px = pre_curl_frame_px
-            pyautogui.moveTo(*pre_curl_screen_xy)
+            self._move_cursor(*pre_curl_screen_xy)
             self._cursor_history.clear()
 
         if self._cursor_frame_px is not None:
