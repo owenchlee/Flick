@@ -284,7 +284,7 @@ class GestureControlApp:
             frame_px = (int(state.cursor[0] * fw), int(state.cursor[1] * fh))
             self._cursor_frame_px = frame_px
             # Time-based window (frame-rate independent); raw position, not the lagging smoothed one.
-            now = time.time()
+            now = time.monotonic()
             self._cursor_history.append((now, frame_px, (int(mapped_x), int(mapped_y))))
             while now - self._cursor_history[0][0] > 0.3:
                 self._cursor_history.popleft()
@@ -439,7 +439,7 @@ class GestureControlApp:
             h.update(on=None, frames=0, off=None, down=False)
 
     def _tick_holds_no_hand(self) -> None:
-        now = time.time()
+        now = time.monotonic()
         for gesture_id in GESTURE_IDS:
             spec = ACTIONS.get(self.config.bindings.get(gesture_id, "none"))
             if spec is not None and spec.kind == "hold":
