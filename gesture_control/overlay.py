@@ -19,6 +19,12 @@ from .config import GESTURE_IDS, GESTURE_LABELS
 FLASH_DURATION = 1.1
 GESTURE_ORDER = list(GESTURE_IDS)
 
+# HUD text sits on near-opaque dark panels so it stays readable over any camera
+# background (WCAG 4.5:1 even in front of a white wall).
+PANEL = theme.BGR["background"]
+MUTED = theme.hex_to_bgr("#CBD5E1")
+BRAND_TEXT = theme.hex_to_bgr("#A5B4FC")
+
 
 def _rounded_rect(img, top_left, bottom_right, color, radius=10, alpha=1.0):
     x1, y1 = top_left
@@ -49,7 +55,8 @@ def draw_grid(frame):
         cv2.line(overlay, (0, y), (w, y), theme.BGR["border"], 1)
         cv2.line(overlay, (x, 0), (x, h), theme.BGR["border"], 1)
     cv2.addWeighted(overlay, 0.35, frame, 0.65, 0, frame)
-    cv2.putText(frame, "GRID", (10, h - 50), theme.CV_FONT, 0.4, theme.BGR["text_muted"], 1, cv2.LINE_AA)
+    _rounded_rect(frame, (6, h - 68), (58, h - 44), PANEL, radius=6, alpha=0.92)
+    cv2.putText(frame, "GRID", (10, h - 50), theme.CV_FONT, 0.4, MUTED, 1, cv2.LINE_AA)
 
 
 def draw_cursor(frame, point, active: bool):
@@ -59,28 +66,28 @@ def draw_cursor(frame, point, active: bool):
 
 
 def _draw_top_bar(frame, w, hand_present: bool, fps: float):
-    _rounded_rect(frame, (10, 10), (w - 10, 54), theme.BGR["surface"], radius=12, alpha=0.72)
+    _rounded_rect(frame, (10, 10), (w - 10, 54), PANEL, radius=12, alpha=0.92)
 
     cv2.putText(frame, "THUMB", (24, 38), theme.CV_FONT_BOLD, 0.62, theme.BGR["text"], 1, cv2.LINE_AA)
     (tw, _), _ = cv2.getTextSize("THUMB", theme.CV_FONT_BOLD, 0.62, 1)
-    cv2.putText(frame, "-DETECTOR", (24 + tw, 38), theme.CV_FONT_BOLD, 0.62, theme.BGR["brand_hover"], 1, cv2.LINE_AA)
+    cv2.putText(frame, "-DETECTOR", (24 + tw, 38), theme.CV_FONT_BOLD, 0.62, BRAND_TEXT, 1, cv2.LINE_AA)
 
     status_color = theme.BGR["success"] if hand_present else theme.BGR["disabled"]
     status_text = "HAND TRACKED" if hand_present else "NO HAND"
     (sw, _), _ = cv2.getTextSize(status_text, theme.CV_FONT, 0.48, 1)
     dot_x = w - 30 - sw - 90
     cv2.circle(frame, (dot_x, 30), 5, status_color, -1, cv2.LINE_AA)
-    cv2.putText(frame, status_text, (dot_x + 12, 35), theme.CV_FONT, 0.48, theme.BGR["text_muted"], 1, cv2.LINE_AA)
+    cv2.putText(frame, status_text, (dot_x + 12, 35), theme.CV_FONT, 0.48, MUTED, 1, cv2.LINE_AA)
 
     fps_text = f"{fps:4.1f} FPS"
-    cv2.putText(frame, fps_text, (w - 100, 35), theme.CV_FONT, 0.48, theme.BGR["text_muted"], 1, cv2.LINE_AA)
+    cv2.putText(frame, fps_text, (w - 100, 35), theme.CV_FONT, 0.48, MUTED, 1, cv2.LINE_AA)
 
 
 def _draw_legend(frame, h, active: dict, bindings: dict):
     row_h = 22
     panel_h = row_h * len(GESTURE_ORDER) + 16
     top = h - panel_h - 46
-    _rounded_rect(frame, (10, top), (272, top + panel_h), theme.BGR["surface"], radius=12, alpha=0.72)
+    _rounded_rect(frame, (10, top), (272, top + panel_h), PANEL, radius=12, alpha=0.92)
 
     y = top + 24
     for gesture_id in GESTURE_ORDER:
@@ -89,23 +96,23 @@ def _draw_legend(frame, h, active: dict, bindings: dict):
         cv2.circle(frame, (26, y - 4), 4, dot_color, -1, cv2.LINE_AA)
 
         label = GESTURE_LABELS[gesture_id]
-        text_color = theme.BGR["text"] if is_active else theme.BGR["text_muted"]
+        text_color = theme.BGR["text"] if is_active else MUTED
         cv2.putText(frame, label, (38, y), theme.CV_FONT, 0.42, text_color, 1, cv2.LINE_AA)
 
         action_id = bindings.get(gesture_id, "none")
-        action_label = ACTIONS[action_id].label if action_id in ACTIONS else "—"
+        action_label = ACTIONS[action_id].label.replace("…", "...") if action_id in ACTIONS else "-"
         (aw, _), _ = cv2.getTextSize(action_label, theme.CV_FONT, 0.4, 1)
         cv2.putText(
             frame, action_label, (262 - aw, y), theme.CV_FONT, 0.4,
-            theme.BGR["brand_hover"] if is_active else theme.BGR["text_muted"], 1, cv2.LINE_AA,
+            BRAND_TEXT if is_active else MUTED, 1, cv2.LINE_AA,
         )
         y += row_h
 
 
 def _draw_bottom_bar(frame, w, h):
-    _rounded_rect(frame, (10, h - 36), (w - 10, h - 10), theme.BGR["surface"], radius=10, alpha=0.72)
+    _rounded_rect(frame, (10, h - 36), (w - 10, h - 10), PANEL, radius=10, alpha=0.92)
     hint = "G Grid   L Landmarks   R Reset   C Reload Config   Q Quit"
-    cv2.putText(frame, hint, (24, h - 17), theme.CV_FONT, 0.42, theme.BGR["text_muted"], 1, cv2.LINE_AA)
+    cv2.putText(frame, hint, (24, h - 17), theme.CV_FONT, 0.42, MUTED, 1, cv2.LINE_AA)
 
 
 def _draw_flash(frame, w, h, flash_text: str, flash_started_at: float):
@@ -122,11 +129,11 @@ def _draw_flash(frame, w, h, flash_text: str, flash_started_at: float):
         frame,
         (cx - tw // 2 - pad, cy - th - pad // 2),
         (cx + tw // 2 + pad, cy + pad // 2),
-        theme.BGR["surface"],
+        PANEL,
         radius=14,
-        alpha=0.55 * alpha + 0.15,
+        alpha=0.92,
     )
-    color = tuple(int(c * alpha + b * (1 - alpha)) for c, b in zip(theme.BGR["success"], theme.BGR["surface"]))
+    color = tuple(int(c * alpha + b * (1 - alpha)) for c, b in zip(theme.BGR["success"], PANEL))
     cv2.putText(frame, flash_text, (cx - tw // 2, cy), theme.CV_FONT_BOLD, 1.1, color, 2, cv2.LINE_AA)
 
 
