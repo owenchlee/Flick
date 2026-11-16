@@ -111,9 +111,25 @@ class _LazyOptionMenu(ctk.CTkOptionMenu):
         super()._open_dropdown_menu()
 
 
+class _DeferredSlider(ctk.CTkSlider):
+    """Redraw once the resizing pauses instead of on every Configure step."""
+
+    _resize_job = None
+
+    def _update_dimensions_event(self, event):
+        if self._resize_job is not None:
+            self.after_cancel(self._resize_job)
+        self._resize_job = self.after(150, self._redraw_after_resize, event)
+
+    def _redraw_after_resize(self, event):
+        self._resize_job = None
+        super()._update_dimensions_event(event)
+
+
 class GestureRow(ctk.CTkFrame):
     def __init__(self, master, gesture_id: str, config: AppConfig, on_change):
         super().__init__(master, fg_color=theme.SURFACE, corner_radius=10)
+        self._resize_job = None
         self.gesture_id = gesture_id
         self.on_change = on_change
         self._label_to_id = {_display_label(a): a for a in _action_choices()}
@@ -164,6 +180,16 @@ class GestureRow(ctk.CTkFrame):
         self.hotkey_var.trace_add("write", lambda *_: self.on_change())
         self._place_hotkey_entry()
 
+    def _update_dimensions_event(self, event):
+        # a drag-resize fires this per step; redraw the rounded rect once the resizing pauses
+        if self._resize_job is not None:
+            self.after_cancel(self._resize_job)
+        self._resize_job = self.after(150, self._redraw_after_resize, event)
+
+    def _redraw_after_resize(self, event):
+        self._resize_job = None
+        super()._update_dimensions_event(event)
+
     def _place_hotkey_entry(self):
         if self.selected_action_id() == "custom_hotkey":
             self.hotkey_entry.grid(row=0, column=3, rowspan=2, padx=(0, 14), pady=10)
@@ -181,42 +207,41 @@ class GestureRow(ctk.CTkFrame):
         return self.hotkey_var.get().strip()
 
 
-class SliderRow(ctk.CTkFrame):
-    def __init__(self, master, key: str, title: str, description: str, value, fmt, on_change):
-        super().__init__(master, fg_color="transparent")
+class SliderRow:
+    """Title/value/description/slider gridded straight into `master` (rows base..base+2).
+
+    Not a CTkFrame: each frame is a canvas that redraws on every resize.
+    """
+
+    def __init__(self, master, base: int, key: str, title: str, description: str, value, fmt, on_change):
         self.key = key
         self.fmt = fmt
         self.on_change = on_change
         lo, hi, _default = SETTINGS_RANGES[key]
         is_int = isinstance(value, int)
-
-        self.grid_columnconfigure(0, weight=1)
-
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew")
-        header.grid_columnconfigure(0, weight=1)
+        top = 16 if base == 0 else 0
 
         ctk.CTkLabel(
-            header, text=title, font=(theme.UI_FONT_FAMILY, 14, "bold"), text_color=theme.TEXT, anchor="w",
-        ).grid(row=0, column=0, sticky="w")
+            master, text=title, font=(theme.UI_FONT_FAMILY, 14, "bold"), text_color=theme.TEXT, anchor="w",
+        ).grid(row=base, column=0, sticky="w", padx=(6, 0), pady=(top, 0))
         self.value_label = ctk.CTkLabel(
-            header, text=fmt(value), font=(theme.UI_FONT_FAMILY_MONO, 13), text_color=theme.BRAND_HOVER,
+            master, text=fmt(value), font=(theme.UI_FONT_FAMILY_MONO, 13), text_color=theme.BRAND_HOVER,
         )
-        self.value_label.grid(row=0, column=1, sticky="e")
+        self.value_label.grid(row=base, column=1, sticky="e", padx=(0, 6), pady=(top, 0))
 
         ctk.CTkLabel(
-            self, text=description, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
-        ).grid(row=1, column=0, sticky="w", pady=(0, 6))
+            master, text=description, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
+        ).grid(row=base + 1, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 6))
 
         steps = (hi - lo) if is_int else round((hi - lo) * 100)  # 0.01 grid
-        self.slider = ctk.CTkSlider(
-            self, from_=lo, to=hi, number_of_steps=max(1, int(steps)),
+        self.slider = _DeferredSlider(
+            master, from_=lo, to=hi, number_of_steps=max(1, int(steps)),
             command=self._on_slide, progress_color=theme.BRAND, button_color=theme.BRAND_HOVER,
             fg_color=theme.SURFACE_MUTED,
         )
         make_focusable(self.slider, {"button_color": theme.TEXT})
         self.slider.set(value)
-        self.slider.grid(row=2, column=0, sticky="ew", pady=(0, 18))
+        self.slider.grid(row=base + 2, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 18))
         self._is_int = is_int
 
     def _on_slide(self, value):
@@ -255,21 +280,23 @@ class ConfiguratorApp(ctk.CTk):
 
     # ─── Layout ─────────────────────────────────────────────────────────
     def _build_header(self):
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=28, pady=(24, 8))
+        # header/tabs/footer share one grid on the root: no grouping frames (each is a redrawing canvas)
+        header = self
+        self.grid_columnconfigure(2, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
         title = ctk.CTkLabel(
             header, text="FLICK", font=(theme.UI_FONT_FAMILY, 22, "bold"), text_color=theme.TEXT,
         )
-        title.pack(side="left")
+        title.grid(row=0, column=0, sticky="w", padx=(28, 0), pady=(24, 8))
         badge = ctk.CTkLabel(
             header, text="CONFIGURATOR", font=(theme.UI_FONT_FAMILY, 12, "bold"),
             text_color=theme.BACKGROUND, fg_color=theme.BRAND, corner_radius=6, padx=8, pady=3,
         )
-        badge.pack(side="left", padx=(10, 0))
+        badge.grid(row=0, column=1, sticky="w", padx=(10, 0), pady=(24, 8))
 
         self.status_label = ctk.CTkLabel(header, text="", font=(theme.UI_FONT_FAMILY, 12), text_color=theme.SUCCESS)
-        self.status_label.pack(side="right")
+        self.status_label.grid(row=0, column=3, columnspan=2, sticky="e", padx=(0, 28), pady=(24, 8))
 
     def _build_tabs(self):
         self.tabs = ctk.CTkTabview(
@@ -277,7 +304,7 @@ class ConfiguratorApp(ctk.CTk):
             segmented_button_selected_hover_color=theme.BRAND_HOVER,
             segmented_button_unselected_color=theme.SURFACE_MUTED, text_color=theme.TEXT,
         )
-        self.tabs.pack(fill="both", expand=True, padx=28, pady=8)
+        self.tabs.grid(row=1, column=0, columnspan=5, sticky="nsew", padx=28, pady=8)
 
         self.sliders: dict[str, SliderRow] = {}
         self.switch_vars: dict[str, ctk.BooleanVar] = {}
@@ -310,6 +337,15 @@ class ConfiguratorApp(ctk.CTk):
 
         scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
         scroll.pack(fill="both", expand=True)
+        # skip scrollbar redraws when the thumb position did not change (each one redraws a canvas)
+        last = []
+
+        def _set_scrollbar(start, end, _set=scroll._scrollbar.set):
+            if last != [start, end]:
+                last[:] = [start, end]
+                _set(start, end)
+
+        scroll._parent_canvas.configure(yscrollcommand=_set_scrollbar)
 
         self.rows: dict[str, GestureRow] = {}
         for gesture_id in GESTURE_IDS:
@@ -318,8 +354,10 @@ class ConfiguratorApp(ctk.CTk):
             self.rows[gesture_id] = row
 
     def _build_sensitivity_tab(self, tab):
+        # Scrollable so every slider stays reachable when the window is shrunk to fit a small screen.
         wrap = ctk.CTkScrollableFrame(tab, fg_color="transparent")
-        wrap.pack(fill="both", expand=True, padx=6, pady=16)
+        wrap.pack(fill="both", expand=True)
+        wrap.grid_columnconfigure(0, weight=1)
 
         settings = self.config.settings
 
@@ -330,93 +368,87 @@ class ConfiguratorApp(ctk.CTk):
             ("scroll_sensitivity", "Scroll sensitivity", "How far each next/previous flick scrolls.", lambda v: f"{v}"),
             ("flick_velocity", "Flick sensitivity", "Lower = a gentler finger flick triggers the next reel.", lambda v: f"{v:.2f}"),
         ]
-        for key, title, desc, fmt in specs:
-            row = SliderRow(wrap, key, title, desc, getattr(settings, key), fmt, on_change=self._mark_dirty)
-            row.pack(fill="x")
-            self.sliders[key] = row
+        for i, (key, title, desc, fmt) in enumerate(specs):
+            self.sliders[key] = SliderRow(
+                wrap, 3 * i, key, title, desc, getattr(settings, key), fmt, on_change=self._mark_dirty,
+            )
 
     def _build_camera_tab(self, tab):
-        wrap = ctk.CTkFrame(tab, fg_color="transparent")
-        wrap.pack(fill="both", expand=True, padx=6, pady=16)
+        wrap = tab  # no grouping frames: each CTkFrame is a canvas that redraws on resize
+        wrap.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
             wrap, text="Camera index", font=(theme.UI_FONT_FAMILY, 14, "bold"), text_color=theme.TEXT, anchor="w",
-        ).pack(fill="x", pady=(0, 4))
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", padx=6, pady=(16, 4))
         ctk.CTkLabel(
             wrap, text="Which webcam to use, if you have more than one (0 is usually the default camera).",
             font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
-        ).pack(fill="x", pady=(0, 8))
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 8))
         self.camera_index_var = ctk.StringVar(value=str(self.config.settings.camera_index))
         camera_entry = ctk.CTkEntry(
             wrap, textvariable=self.camera_index_var, width=80,
             fg_color=theme.SURFACE_MUTED, border_color=theme.BORDER, text_color=theme.TEXT,
         )
-        camera_entry.pack(anchor="w", pady=(0, 20))
+        camera_entry.grid(row=2, column=0, columnspan=2, sticky="w", padx=6, pady=(0, 20))
         self.camera_index_var.trace_add("write", lambda *_: self._mark_dirty())
 
-        for key, label, desc in [
+        for i, (key, label, desc) in enumerate([
             ("mirror", "Mirror the camera feed", "Flip horizontally so it acts like a mirror."),
             ("move_cursor", "Move the mouse with my hand", "Off: the mouse stays put, so scrolls and clicks land where you left it."),
             ("show_landmarks", "Show hand skeleton", "Draw the tracked hand landmarks on screen."),
             ("show_grid", "Show coordinate grid", "Overlay a grid for debugging tracking."),
-        ]:
-            row = ctk.CTkFrame(wrap, fg_color="transparent")
-            row.pack(fill="x", pady=6)
+        ]):
+            r = 3 + 2 * i
             var = ctk.BooleanVar(value=getattr(self.config.settings, key))
             switch = ctk.CTkSwitch(
-                row, text="", variable=var, progress_color=theme.BRAND, button_color=theme.TEXT,
+                wrap, text="", variable=var, progress_color=theme.BRAND, button_color=theme.TEXT,
                 command=self._mark_dirty,
             )
             make_focusable(switch, {"button_color": theme.BRAND_HOVER})
-            switch.pack(side="left")
-            text_col = ctk.CTkFrame(row, fg_color="transparent")
-            text_col.pack(side="left", padx=(10, 0))
+            switch.grid(row=r, column=0, rowspan=2, padx=(6, 0), pady=6, sticky="w")
             ctk.CTkLabel(
-                text_col, text=label, font=(theme.UI_FONT_FAMILY, 13, "bold"), text_color=theme.TEXT, anchor="w",
-            ).pack(anchor="w")
+                wrap, text=label, font=(theme.UI_FONT_FAMILY, 13, "bold"), text_color=theme.TEXT, anchor="w",
+            ).grid(row=r, column=1, sticky="ew", padx=(10, 6), pady=(6, 0))
             ctk.CTkLabel(
-                text_col, text=desc, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
-            ).pack(anchor="w")
+                wrap, text=desc, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
+            ).grid(row=r + 1, column=1, sticky="ew", padx=(10, 6), pady=(0, 6))
             self.switch_vars[key] = var
 
     def _build_about_tab(self, tab):
-        wrap = ctk.CTkFrame(tab, fg_color="transparent")
-        wrap.pack(fill="both", expand=True, padx=6, pady=16)
+        wrap = tab  # no grouping frame: each CTkFrame is a canvas that redraws on resize
+        wrap.grid_columnconfigure(1, weight=1)  # spanning labels must not widen the shortcut-key column
 
         ctk.CTkLabel(
             wrap, text="Flick", font=(theme.UI_FONT_FAMILY, 18, "bold"), text_color=theme.TEXT, anchor="w",
-        ).pack(fill="x")
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", padx=6, pady=(16, 0))
         ctk.CTkLabel(
             wrap,
             text="Scroll and react to short-form video feeds — Reels, Shorts, TikTok — with hand gestures.",
             font=(theme.UI_FONT_FAMILY, 12), text_color=theme.TEXT_MUTED, anchor="w", justify="left",
-        ).pack(fill="x", pady=(4, 18))
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(4, 18))
 
         ctk.CTkLabel(
             wrap, text="Tracker window shortcuts", font=(theme.UI_FONT_FAMILY, 14, "bold"),
             text_color=theme.TEXT, anchor="w",
-        ).pack(fill="x", pady=(0, 6))
+        ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 6))
 
-        for key, desc in [
+        for r, (key, desc) in enumerate([
             ("G", "Toggle the coordinate grid overlay"),
             ("L", "Toggle the hand-skeleton overlay"),
             ("R", "Reset cursor smoothing"),
             ("C", "Reload config.json without restarting"),
             ("Q / Esc", "Quit"),
-        ]:
-            row = ctk.CTkFrame(wrap, fg_color="transparent")
-            row.pack(fill="x", pady=2)
+        ], start=3):
             ctk.CTkLabel(
-                row, text=key, font=(theme.UI_FONT_FAMILY_MONO, 12, "bold"), text_color=theme.BRAND_HOVER, width=70,
+                wrap, text=key, font=(theme.UI_FONT_FAMILY_MONO, 12, "bold"), text_color=theme.BRAND_HOVER, width=70,
                 anchor="w",
-            ).pack(side="left")
+            ).grid(row=r, column=0, sticky="w", padx=6, pady=2)
             ctk.CTkLabel(
-                row, text=desc, font=(theme.UI_FONT_FAMILY, 12), text_color=theme.TEXT_MUTED, anchor="w",
-            ).pack(side="left")
+                wrap, text=desc, font=(theme.UI_FONT_FAMILY, 12), text_color=theme.TEXT_MUTED, anchor="w",
+            ).grid(row=r, column=1, sticky="w", padx=6, pady=2)
 
     def _build_footer(self):
-        footer = ctk.CTkFrame(self, fg_color="transparent")
-        footer.pack(fill="x", padx=28, pady=(8, 24))
+        footer = self
 
         reset_btn = ctk.CTkButton(
             footer, text="Reset to Defaults", fg_color="transparent", border_width=1,
@@ -424,7 +456,8 @@ class ConfiguratorApp(ctk.CTk):
             command=self._reset_defaults,
         )
         make_focusable(reset_btn, RING_BUTTON)
-        reset_btn.pack(side="left")
+        # span into the stretch column so the button width does not push the header badge away from the title
+        reset_btn.grid(row=2, column=0, columnspan=3, sticky="w", padx=(28, 0), pady=(8, 24))
 
         launch_btn = ctk.CTkButton(
             footer, text="Save & Launch", fg_color=theme.SUCCESS, hover_color="#16A34A",
@@ -432,7 +465,7 @@ class ConfiguratorApp(ctk.CTk):
             command=self._save_and_launch,
         )
         make_focusable(launch_btn, RING_BUTTON)
-        launch_btn.pack(side="right")
+        launch_btn.grid(row=2, column=4, sticky="e", padx=(0, 28), pady=(8, 24))
 
         save_btn = ctk.CTkButton(
             footer, text="Save", fg_color=theme.BRAND, hover_color=theme.BRAND_HOVER,
@@ -440,7 +473,7 @@ class ConfiguratorApp(ctk.CTk):
             command=self._save,
         )
         make_focusable(save_btn, RING_BUTTON)
-        save_btn.pack(side="right", padx=(0, 10))
+        save_btn.grid(row=2, column=3, sticky="e", padx=(0, 10), pady=(8, 24))
 
     # ─── State ─────────────────────────────────────────────────────────
     def _mark_dirty(self):
