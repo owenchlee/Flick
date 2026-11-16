@@ -148,7 +148,7 @@ class SliderRow(ctk.CTkFrame):
             self, text=description, font=(theme.UI_FONT_FAMILY, 11), text_color=theme.TEXT_MUTED, anchor="w",
         ).grid(row=1, column=0, sticky="w", pady=(0, 6))
 
-        steps = (hi - lo) if is_int else 100
+        steps = (hi - lo) if is_int else round((hi - lo) * 100)  # 0.01 grid
         self.slider = ctk.CTkSlider(
             self, from_=lo, to=hi, number_of_steps=max(1, int(steps)),
             command=self._on_slide, progress_color=theme.BRAND, button_color=theme.BRAND_HOVER,
