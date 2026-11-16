@@ -11,7 +11,11 @@ than the legacy `mp.solutions.hands`, which mediapipe removed in 1.0.
 
 from __future__ import annotations
 
+import os
 import platform
+import shutil
+import tempfile
+import zipfile
 import threading
 import time
 import urllib.request
@@ -55,13 +59,25 @@ class Camera:
         self._cap.release()
 
 
+def _model_ok(path: Path) -> bool:
+    # The .task file is a zip; HTML pages and truncated downloads are not.
+    return path.is_file() and zipfile.is_zipfile(path)
+
+
 def _ensure_model() -> None:
-    if MODEL_PATH.exists():
+    if _model_ok(MODEL_PATH):
         return
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = MODEL_PATH.with_suffix(".tmp")
-    urllib.request.urlretrieve(MODEL_URL, tmp_path)
-    tmp_path.replace(MODEL_PATH)
+    fd, tmp = tempfile.mkstemp(dir=MODEL_PATH.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as out, urllib.request.urlopen(MODEL_URL, timeout=30) as resp:
+            shutil.copyfileobj(resp, out)
+        if not _model_ok(Path(tmp)):
+            raise RuntimeError("downloaded hand model is not a valid .task file")
+        os.replace(tmp, MODEL_PATH)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
 
 
 class _HandLandmarks:
