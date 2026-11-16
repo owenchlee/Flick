@@ -52,6 +52,8 @@ class GestureControlApp:
 
         self.camera: Camera | None = None
         self.tracker: HandTracker | None = None
+        self._hand_seen = False
+        self._idle_tick = 0
 
         # Last on-screen aim point, held from the most recent frame where the
         # index finger was actually extended (point/peace). Curling into
@@ -146,15 +148,18 @@ class GestureControlApp:
                 active = {g: False for g in GESTURE_IDS}
                 hand_present = False
 
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                try:
-                    result = self.tracker.process(rgb)
-                except RuntimeError as exc:
-                    # One bad frame must not kill the app: treat it as "no hand".
-                    result = None
-                    if not tracker_error_reported:
-                        print(f"Hand tracker failed on a frame ({exc}); continuing.")
-                        tracker_error_reported = True
+                # Idle: only look for a hand on every 3rd frame (~100 ms pickup) to save CPU.
+                self._idle_tick += 1
+                result = None
+                if self._hand_seen or self._idle_tick % 3 == 0:
+                    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    try:
+                        result = self.tracker.process(rgb)
+                    except RuntimeError as exc:
+                        # One bad frame must not kill the app: treat it as "no hand".
+                        if not tracker_error_reported:
+                            print(f"Hand tracker failed on a frame ({exc}); continuing.")
+                            tracker_error_reported = True
 
                 state = None
                 if result is not None and result.multi_hand_landmarks:
@@ -166,6 +171,7 @@ class GestureControlApp:
                         if not tracker_error_reported:
                             print(f"Bad landmarks from tracker ({exc}); continuing.")
                             tracker_error_reported = True
+                self._hand_seen = state is not None
 
                 if state is not None:
                     hand_present = True
