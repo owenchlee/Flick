@@ -124,12 +124,6 @@ class GestureControlApp:
                 if self.config.settings.mirror:
                     frame = cv2.flip(frame, 1)
 
-                if not self._handle_keys():
-                    break
-
-                if self.show_grid:
-                    draw_grid(frame)
-
                 active = {g: False for g in GESTURE_IDS}
                 hand_present = False
 
@@ -170,6 +164,9 @@ class GestureControlApp:
                     self._flick_hist.clear()
                     self._flick_armed = True
 
+                if self.show_grid:
+                    draw_grid(frame)
+
                 self._update_fps()
                 draw_hud(
                     frame,
@@ -183,6 +180,10 @@ class GestureControlApp:
 
                 cv2.imshow(WINDOW_TITLE, frame)
                 cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 1)
+
+                # Polled after imshow so key handling never sits between capture and dispatch.
+                if not self._handle_keys():
+                    break
                 # The X button hides the window but imshow would re-create it: quit instead.
                 if cv2.getWindowProperty(WINDOW_TITLE, cv2.WND_PROP_VISIBLE) < 1:
                     break
@@ -194,7 +195,7 @@ class GestureControlApp:
 
     # ─── Per-frame helpers ─────────────────────────────────────────────────
     def _handle_keys(self) -> bool:
-        key = cv2.waitKey(1) & 0xFF
+        key = cv2.pollKey() & 0xFF  # non-blocking; waitKey(1) stalls ~15 ms on Windows
         if 65 <= key <= 90:  # Caps Lock: fold upper-case to lower-case
             key += 32
         if key in (ord("q"), 27):
