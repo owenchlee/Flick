@@ -284,6 +284,10 @@ class GestureControlApp:
                 continue
 
             is_active = state.active.get(gesture_id, False)
+            # Several gestures may share one action; hold/scroll state is per action.
+            any_active = any(
+                state.active.get(g, False) for g in GESTURE_IDS if self.config.bindings.get(g) == action_id
+            )
 
             if spec.kind == "hold":
                 self._step_hold(gesture_id, spec.id, is_active, now)
@@ -300,7 +304,7 @@ class GestureControlApp:
                 # (e.g. to aim before a thumbs-up) never triggers it.
                 if not is_active:
                     # tolerate a single dropped pose frame; reset after a real release
-                    if not self._flick_hist or now - self._flick_hist[-1][0] > 0.2:
+                    if not any_active and (not self._flick_hist or now - self._flick_hist[-1][0] > 0.2):
                         self._flick_hist.clear()
                         self._flick_armed = True
                     continue
@@ -374,7 +378,13 @@ class GestureControlApp:
         if h["off"] is None:
             h["off"] = now
         if now - h["off"] >= HOLD_GRACE_S:
-            self._flash(self.executor.end_hold(spec_id))
+            # Another gesture bound to the same action still holds it down: hand over, don't release.
+            shared = any(
+                other is not h and other["down"] and self.config.bindings.get(g) == self.config.bindings.get(gesture_id)
+                for g, other in self._hold.items()
+            )
+            if not shared:
+                self._flash(self.executor.end_hold(spec_id))
             h.update(on=None, frames=0, off=None, down=False)
 
     def _tick_holds_no_hand(self) -> None:
