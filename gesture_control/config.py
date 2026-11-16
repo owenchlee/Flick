@@ -136,12 +136,15 @@ def load_config(path: Path = CONFIG_PATH) -> AppConfig:
 
 
 def save_config(config: AppConfig, path: Path = CONFIG_PATH) -> None:
+    # Write to a temp file in the same dir, then atomically replace the target.
     path = Path(path)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(config.to_dict(), fh, indent=2)
             fh.write("\n")
+            fh.flush()
+            os.fsync(fh.fileno())
         os.replace(tmp, path)
     except BaseException:
         try:

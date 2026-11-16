@@ -446,10 +446,12 @@ class ConfiguratorApp(ctk.CTk):
 
     def _save(self):
         self.config = self._collect_config()
-        save_config(self.config)
+        if not _write_config(self):
+            return False
         self._dirty = False
         self.status_label.configure(text="Saved ✓", text_color=theme.SUCCESS)
         self.after(2500, self._clear_status)
+        return True
 
     def _clear_status(self):
         if not self._dirty:  # keep the "Unsaved changes" warning
@@ -462,7 +464,8 @@ class ConfiguratorApp(ctk.CTk):
         self.destroy()
 
     def _save_and_launch(self):
-        self._save()
+        if not self._save():
+            return
         if self._proc is not None and self._proc.poll() is None:
             self.status_label.configure(text="Saved ✓ · Already running", text_color=theme.SUCCESS)
             return
@@ -473,9 +476,21 @@ class ConfiguratorApp(ctk.CTk):
         if not messagebox.askyesno("Reset to Defaults", "Overwrite all settings with defaults?"):
             return
         self.config = AppConfig.default()
-        save_config(self.config)
+        if not _write_config(self):
+            return
         self.destroy()
         run_configurator()
+
+
+def _write_config(app):
+    """Save app.config; on failure keep it dirty and show a red status. Returns success."""
+    try:
+        save_config(app.config)
+    except OSError as exc:
+        app._dirty = True
+        app.status_label.configure(text=f"Could not save: {exc}", text_color=theme.DANGER)
+        return False
+    return True
 
 
 def run_configurator():
