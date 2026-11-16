@@ -59,7 +59,7 @@ class GestureControlApp:
         # itself dragging the index tip toward the palm — the oldest
         # sample here (from just before the curl started) is used to
         # re-anchor the cursor instead of the drifted final frame.
-        self._cursor_history: deque = deque(maxlen=6)
+        self._cursor_history: deque = deque()
 
         self.show_landmarks = self.config.settings.show_landmarks
         self.show_grid = self.config.settings.show_grid
@@ -242,15 +242,20 @@ class GestureControlApp:
             sx, sy = self.smoother.smooth((mapped_x, mapped_y))
             if self.config.settings.move_cursor:
                 self._move_cursor(sx, sy)
-            frame_px = (int(state.cursor[0] * FRAME_W), int(state.cursor[1] * FRAME_H))
+            fh, fw = frame.shape[:2]
+            frame_px = (int(state.cursor[0] * fw), int(state.cursor[1] * fh))
             self._cursor_frame_px = frame_px
-            self._cursor_history.append((frame_px, (sx, sy)))
+            # Time-based window (frame-rate independent); raw position, not the lagging smoothed one.
+            now = time.time()
+            self._cursor_history.append((now, frame_px, (int(mapped_x), int(mapped_y))))
+            while now - self._cursor_history[0][0] > 0.3:
+                self._cursor_history.popleft()
         elif self._cursor_history:
             # Just curled out of point/peace — re-anchor on the oldest
             # (pre-curl) sample and actually move the OS cursor there, so
             # the click that's about to fire lands where the user aimed,
             # not wherever the fingertip drifted to mid-curl.
-            pre_curl_frame_px, pre_curl_screen_xy = self._cursor_history[0]
+            _, pre_curl_frame_px, pre_curl_screen_xy = self._cursor_history[0]
             self._cursor_frame_px = pre_curl_frame_px
             if self.config.settings.move_cursor:
                 self._move_cursor(*pre_curl_screen_xy)
