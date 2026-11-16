@@ -78,7 +78,8 @@ def make_focusable(w, ring: dict):
         "CTkOptionMenu": {k: (lambda: w._open_dropdown_menu()) for k in ("<Return>", "<space>", "<Down>", "<Up>")},
         "CTkSlider": {"<Right>": lambda: step(1), "<Up>": lambda: step(1),
                       "<Left>": lambda: step(-1), "<Down>": lambda: step(-1)},
-    }[type(w).__name__]
+    }
+    keys = next(keys[c.__name__] for c in type(w).__mro__ if c.__name__ in keys)
     for key, fn in keys.items():
         canvas.bind(key, lambda _e, fn=fn: (fn(), "break")[1])
 
@@ -94,6 +95,20 @@ def make_focusable(w, ring: dict):
 
     canvas.bind("<FocusIn>", focus_in)
     canvas.bind("<FocusOut>", focus_out)
+
+
+class _LazyOptionMenu(ctk.CTkOptionMenu):
+    """Builds the dropdown entries only when first opened (saves startup time)."""
+
+    def __init__(self, master, all_values, **kwargs):
+        super().__init__(master, **kwargs)
+        self._all_values = all_values
+
+    def _open_dropdown_menu(self):
+        if self._all_values is not None:
+            self.configure(values=self._all_values)
+            self._all_values = None
+        super()._open_dropdown_menu()
 
 
 class GestureRow(ctk.CTkFrame):
@@ -125,9 +140,10 @@ class GestureRow(ctk.CTkFrame):
 
         current_action = config.bindings.get(gesture_id, "none")
         self.menu_var = ctk.StringVar(value=self._id_to_label.get(current_action, self._id_to_label["none"]))
-        self.menu = ctk.CTkOptionMenu(
+        self.menu = _LazyOptionMenu(
             self,
-            values=[self._id_to_label[a] for a in _action_choices()],
+            all_values=[self._id_to_label[a] for a in _action_choices()],
+            values=[self.menu_var.get()],
             variable=self.menu_var,
             command=self._on_select,
             fg_color=theme.SURFACE_MUTED,
@@ -215,8 +231,10 @@ class SliderRow(ctk.CTkFrame):
 
 class ConfiguratorApp(ctk.CTk):
     def __init__(self):
+        # Set the mode before the window exists so no widget needs a theme re-pass.
+        if ctk.get_appearance_mode() != "Dark":
+            ctk.set_appearance_mode("dark")
         super().__init__()
-        ctk.set_appearance_mode("dark")
 
         self.config = load_config()
         self._dirty = False
@@ -261,18 +279,27 @@ class ConfiguratorApp(ctk.CTk):
         )
         self.tabs.pack(fill="both", expand=True, padx=28, pady=8)
 
-        gestures_tab = self.tabs.add("Gestures")
-        sensitivity_tab = self.tabs.add("Sensitivity")
-        camera_tab = self.tabs.add("Camera")
-        about_tab = self.tabs.add("About")
+        self.sliders: dict[str, SliderRow] = {}
+        self.switch_vars: dict[str, ctk.BooleanVar] = {}
+        self.camera_index_var = None
+        # Non-visible tabs are built on first selection; unbuilt ones keep the loaded config values.
+        self._lazy_builders = {
+            "Sensitivity": self._build_sensitivity_tab,
+            "Camera": self._build_camera_tab,
+            "About": self._build_about_tab,
+        }
+        self.tabs.configure(command=self._on_tab_change)
+        for name in ("Gestures", "Sensitivity", "Camera", "About"):
+            self.tabs.add(name)
+        self._build_gestures_tab(self.tabs.tab("Gestures"))
 
         for btn in self.tabs._segmented_button._buttons_dict.values():
             make_focusable(btn, RING_BUTTON)
 
-        self._build_gestures_tab(gestures_tab)
-        self._build_sensitivity_tab(sensitivity_tab)
-        self._build_camera_tab(camera_tab)
-        self._build_about_tab(about_tab)
+    def _on_tab_change(self):
+        builder = self._lazy_builders.pop(self.tabs.get(), None)
+        if builder:
+            builder(self.tabs.tab(self.tabs.get()))
 
     def _build_gestures_tab(self, tab):
         intro = ctk.CTkLabel(
@@ -295,7 +322,6 @@ class ConfiguratorApp(ctk.CTk):
         wrap.pack(fill="both", expand=True, padx=6, pady=16)
 
         settings = self.config.settings
-        self.sliders: dict[str, SliderRow] = {}
 
         specs = [
             ("smoothing", "Cursor smoothing", "Higher = steadier cursor, more lag.", lambda v: f"{v} frames"),
@@ -328,7 +354,6 @@ class ConfiguratorApp(ctk.CTk):
         camera_entry.pack(anchor="w", pady=(0, 20))
         self.camera_index_var.trace_add("write", lambda *_: self._mark_dirty())
 
-        self.switch_vars: dict[str, ctk.BooleanVar] = {}
         for key, label, desc in [
             ("mirror", "Mirror the camera feed", "Flip horizontally so it acts like a mirror."),
             ("move_cursor", "Move the mouse with my hand", "Off: the mouse stays put, so scrolls and clicks land where you left it."),
@@ -432,14 +457,13 @@ class ConfiguratorApp(ctk.CTk):
         settings = self.config.settings
         for key, slider in self.sliders.items():
             setattr(settings, key, slider.value())
-        settings.mirror = self.switch_vars["mirror"].get()
-        settings.move_cursor = self.switch_vars["move_cursor"].get()
-        settings.show_landmarks = self.switch_vars["show_landmarks"].get()
-        settings.show_grid = self.switch_vars["show_grid"].get()
-        try:
-            settings.camera_index = int(self.camera_index_var.get())
-        except ValueError:
-            settings.camera_index = 0
+        for key, var in self.switch_vars.items():
+            setattr(settings, key, var.get())
+        if self.camera_index_var is not None:
+            try:
+                settings.camera_index = int(self.camera_index_var.get())
+            except ValueError:
+                settings.camera_index = 0
         settings.clamp()
 
         return AppConfig(bindings=bindings, custom_hotkeys=custom_hotkeys, settings=settings)
