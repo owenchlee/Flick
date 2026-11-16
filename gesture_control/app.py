@@ -99,8 +99,6 @@ class GestureControlApp:
 
         self.tracker = HandTracker()
         self.camera = Camera(index=self.config.settings.camera_index, width=FRAME_W, height=FRAME_H)
-        self.camera.warm_up()
-        self.tracker.wait_until_ready()
 
         if not self.camera.is_opened():
             index = self.config.settings.camera_index
@@ -123,6 +121,17 @@ class GestureControlApp:
 
                 if self.config.settings.mirror:
                     frame = cv2.flip(frame, 1)
+
+                if not self.tracker.is_ready():
+                    # Show the camera while the model loads; no tracking, no actions.
+                    cv2.putText(frame, "Loading hand tracking...", (10, 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                    cv2.imshow(WINDOW_TITLE, frame)
+                    cv2.setWindowProperty(WINDOW_TITLE, cv2.WND_PROP_TOPMOST, 1)
+                    if not self._handle_keys():
+                        break
+                    continue
+                self.tracker.wait_until_ready()  # raises if the model failed to load
 
                 active = {g: False for g in GESTURE_IDS}
                 hand_present = False

@@ -141,6 +141,9 @@ class HandTracker:
         ]
         self._landmarker = vision.HandLandmarker.create_from_options(options)
 
+    def is_ready(self) -> bool:
+        return not self._thread.is_alive()
+
     def wait_until_ready(self) -> None:
         self._thread.join()
         if self._init_error is not None:
