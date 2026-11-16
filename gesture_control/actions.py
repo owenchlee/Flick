@@ -70,6 +70,14 @@ class ActionExecutor:
         self.backend = backend if backend is not None else default_backend()
         self._held: set = set()
 
+    def _call(self, name: str, *args) -> bool:
+        """Runs a backend call; IO failures must not kill the tracker loop."""
+        try:
+            self.backend[name](*args)
+            return True
+        except Exception:
+            return False
+
     def fire(self, action_id: str, custom_hotkey: str = "", scroll_amount: int = 0) -> Optional[str]:
         """Runs an instant action; returns a HUD status string, or None."""
         spec = ACTIONS.get(action_id)
@@ -77,17 +85,17 @@ class ActionExecutor:
             return None
 
         if spec.id == CUSTOM_HOTKEY:
-            if not custom_hotkey:
+            hotkey = (custom_hotkey or "").strip()
+            if not hotkey or not self._call("hotkey", hotkey):
                 return None
-            self.backend["hotkey"](custom_hotkey)
-            return custom_hotkey.upper()
+            return hotkey.upper()
 
         if spec.id in (LIKE, OPEN_COMMENTS):
-            self.backend["click"]()
-        elif spec.id == SCROLL_PREV:
-            if not scroll_amount:
+            if not self._call("click"):
                 return None
-            self.backend["scroll"](scroll_amount)
+        elif spec.id == SCROLL_PREV:
+            if not scroll_amount or not self._call("scroll", scroll_amount):
+                return None
         else:
             return None
 
@@ -95,15 +103,17 @@ class ActionExecutor:
 
     def begin_hold(self, action_id: str) -> Optional[str]:
         if action_id == SPEED_2X and SPEED_2X not in self._held:
+            if not self._call("mouse_down"):
+                return None
             self._held.add(SPEED_2X)
-            self.backend["mouse_down"]()
             return "2X SPEED"
         return None
 
     def end_hold(self, action_id: str) -> Optional[str]:
         if action_id == SPEED_2X and SPEED_2X in self._held:
+            if not self._call("mouse_up"):
+                return None  # stay held so release_all_holds can retry
             self._held.discard(SPEED_2X)
-            self.backend["mouse_up"]()
             return "NORMAL SPEED"
         return None
 
@@ -113,4 +123,4 @@ class ActionExecutor:
 
     def scroll(self, action_id: str, amount: int) -> None:
         if action_id == SCROLL and amount:
-            self.backend["scroll"](amount)
+            self._call("scroll", amount)
