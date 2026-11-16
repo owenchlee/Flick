@@ -64,7 +64,7 @@ class GestureControlApp:
 
         self.fps = 0.0
         self._fps_frames = 0
-        self._fps_started = time.time()
+        self._fps_started = time.monotonic()
 
         self._cooldowns = {gesture_id: 0.0 for gesture_id in GESTURE_IDS}
         self._edge: dict = {}
@@ -78,7 +78,7 @@ class GestureControlApp:
         if not text:
             return
         self.flash_text = text
-        self.flash_started_at = time.time()
+        self.flash_started_at = time.monotonic()
 
     def run(self) -> None:
         pyautogui.FAILSAFE = False
@@ -242,7 +242,7 @@ class GestureControlApp:
             draw_cursor(frame, self._cursor_frame_px, highlight)
 
     def _dispatch(self, state) -> None:
-        now = time.time()
+        now = time.monotonic()
         for gesture_id in GESTURE_IDS:
             action_id = self.config.bindings.get(gesture_id, "none")
             spec = ACTIONS.get(action_id)
@@ -358,8 +358,8 @@ class GestureControlApp:
 
     def _update_fps(self) -> None:
         self._fps_frames += 1
-        elapsed = time.time() - self._fps_started
+        elapsed = time.monotonic() - self._fps_started
         if elapsed >= 0.5:
             self.fps = self._fps_frames / elapsed
             self._fps_frames = 0
-            self._fps_started = time.time()
+            self._fps_started = time.monotonic()

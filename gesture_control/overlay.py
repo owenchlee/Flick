@@ -118,7 +118,7 @@ def _draw_bottom_bar(frame, w, h):
 def _draw_flash(frame, w, h, flash_text: str, flash_started_at: float):
     if not flash_text:
         return
-    age = time.time() - flash_started_at
+    age = time.monotonic() - flash_started_at
     if age > FLASH_DURATION:
         return
     alpha = max(0.0, 1.0 - (age / FLASH_DURATION))
