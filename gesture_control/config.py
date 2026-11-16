@@ -7,8 +7,13 @@ are picked up by the other.
 from __future__ import annotations
 
 import json
+import math
+import os
+import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+from gesture_control.actions import ACTIONS
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.json"
 
@@ -59,8 +64,17 @@ class Settings:
     flick_velocity: float = SETTINGS_RANGES["flick_velocity"][2]
 
     def clamp(self) -> None:
+        for name in ("mirror", "show_landmarks", "show_grid"):
+            if not isinstance(getattr(self, name), bool):
+                setattr(self, name, type(self).__dataclass_fields__[name].default)
+        cam = self.camera_index
+        if isinstance(cam, float) and math.isfinite(cam) and cam == int(cam):
+            cam = int(cam)
+        self.camera_index = cam if type(cam) is int and cam >= 0 else 0
         for name, (lo, hi, default) in SETTINGS_RANGES.items():
             value = getattr(self, name)
+            if type(value) not in (int, float) or not math.isfinite(value):
+                value = default
             # Cast using the field's declared type (from its default), not
             # the incoming value's type — an out-of-range int for a float
             # field must not silently truncate (e.g. int(0.15) == 0).
@@ -79,18 +93,25 @@ class AppConfig:
 
     @classmethod
     def from_dict(cls, data: dict) -> "AppConfig":
-        bindings = dict(DEFAULT_BINDINGS)
-        bindings.update(data.get("bindings", {}))
-        bindings = {g: bindings.get(g, DEFAULT_BINDINGS[g]) for g in GESTURE_IDS}
+        if not isinstance(data, dict):
+            data = {}
+        raw = data.get("bindings")
+        raw = raw if isinstance(raw, dict) else {}
+        bindings = {
+            g: raw[g] if isinstance(raw.get(g), str) and raw[g] in ACTIONS else DEFAULT_BINDINGS[g]
+            for g in GESTURE_IDS
+        }
 
-        settings_data = data.get("settings", {})
-        settings_fields = {f for f in Settings.__dataclass_fields__}
-        settings = Settings(**{k: v for k, v in settings_data.items() if k in settings_fields})
+        settings_data = data.get("settings")
+        settings_data = settings_data if isinstance(settings_data, dict) else {}
+        settings = Settings(**{k: v for k, v in settings_data.items() if k in Settings.__dataclass_fields__})
         settings.clamp()
+        hotkeys = data.get("custom_hotkeys")
+        hotkeys = hotkeys if isinstance(hotkeys, dict) else {}
 
         return cls(
             bindings=bindings,
-            custom_hotkeys=dict(data.get("custom_hotkeys", {})),
+            custom_hotkeys={k: v for k, v in hotkeys.items() if isinstance(k, str) and isinstance(v, str)},
             settings=settings,
         )
 
@@ -106,14 +127,24 @@ def load_config(path: Path = CONFIG_PATH) -> AppConfig:
     if not path.exists():
         return AppConfig.default()
     try:
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, "r", encoding="utf-8-sig") as fh:
             data = json.load(fh)
-    except (json.JSONDecodeError, OSError):
+    except (ValueError, OSError):
         return AppConfig.default()
     return AppConfig.from_dict(data)
 
 
 def save_config(config: AppConfig, path: Path = CONFIG_PATH) -> None:
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(config.to_dict(), fh, indent=2)
-        fh.write("\n")
+    path = Path(path)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(config.to_dict(), fh, indent=2)
+            fh.write("\n")
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
