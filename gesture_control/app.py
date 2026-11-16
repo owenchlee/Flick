@@ -10,6 +10,7 @@ configurator remap any gesture to any action without touching this file.
 
 from __future__ import annotations
 
+import math
 import time
 from collections import deque
 
@@ -23,6 +24,11 @@ from .gestures import analyze
 from .hand_tracker import Camera, HandTracker
 from .overlay import draw_cursor, draw_grid, draw_hud
 from .smoother import OneEuroSmoother
+
+# A flick only counts after the point pose has been tracked this long, and not
+# across a frame where the wrist jumped more than this many palm sizes.
+FLICK_ARM_DELAY = 0.15
+FLICK_JUMP_PALMS = 1.0
 
 WINDOW_TITLE = "Flick"
 FRAME_W, FRAME_H = 640, 480
@@ -77,6 +83,10 @@ class GestureControlApp:
         # see _dispatch's "scroll" branch.
         self._flick_hist = deque()
         self._flick_armed = True
+        self._flick_since = None
+        self._flick_calm = 0.0
+        self._flick_moving = False
+        self._flick_prev_wrist = None
         # Per-gesture state for instant actions: a pose must be held for
         # HOLD_FRAMES before it fires, fires once, and only re-arms after
         # RELEASE_FRAMES of not being held.
@@ -172,6 +182,8 @@ class GestureControlApp:
                     self._cursor_history.clear()
                     self._flick_hist.clear()
                     self._flick_armed = True
+                    self._flick_since = None
+                    self._flick_prev_wrist = None
 
                 if self.show_grid:
                     draw_grid(frame)
@@ -317,7 +329,22 @@ class GestureControlApp:
                     if not any_active and (not self._flick_hist or now - self._flick_hist[-1][0] > 0.2):
                         self._flick_hist.clear()
                         self._flick_armed = True
+                        self._flick_since = None
+                        self._flick_prev_wrist = None
                     continue
+
+                # A wrist jump of more than a palm in one frame is a tracking
+                # glitch or a hand entering view, not a flick: start over.
+                wx, wy = state.wrist
+                if self._flick_prev_wrist is not None and math.hypot(
+                    wx - self._flick_prev_wrist[0], wy - self._flick_prev_wrist[1]
+                ) > FLICK_JUMP_PALMS * state.palm_size:
+                    self._flick_hist.clear()
+                    self._flick_since = None
+                    self._flick_armed = True
+                self._flick_prev_wrist = (wx, wy)
+                if self._flick_since is None:
+                    self._flick_since, self._flick_moving, self._flick_calm = now, False, 0.0
 
                 norm_y = self._normalized_y(state.cursor[1])
                 # Velocity is the net displacement over a ~0.15 s window, not
@@ -331,11 +358,19 @@ class GestureControlApp:
                 span = now - hist[0][0]
                 if span >= 0.05:
                     velocity = (norm_y - hist[0][1]) / span  # negative = moving up
+                    # calm = length of the still run before the current motion began
+                    if velocity > -self.config.settings.flick_velocity * 0.5:
+                        if self._flick_moving:
+                            self._flick_since, self._flick_moving = now, False
+                        self._flick_calm = now - self._flick_since
+                    else:
+                        self._flick_moving = True
                     fired_recently = (
                         now - self._cooldowns.get(gesture_id, 0.0) < self.config.settings.action_cooldown
                     )
                     big_enough = hist[0][1] - norm_y >= 0.05
-                    if self._flick_armed and not fired_recently and big_enough and velocity < -self.config.settings.flick_velocity:
+                    calm_enough = self._flick_calm >= FLICK_ARM_DELAY
+                    if self._flick_armed and not fired_recently and big_enough and calm_enough and velocity < -self.config.settings.flick_velocity:
                         self.executor.scroll(spec.id, -self.config.settings.scroll_sensitivity)
                         self._flash("NEXT REEL")
                         self._cooldowns[gesture_id] = now

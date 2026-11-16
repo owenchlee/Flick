@@ -45,6 +45,8 @@ class GestureState:
     cursor: tuple   # (x, y) normalized index-fingertip position
     active: dict    # gesture_id -> bool
     reach: float = 0.0  # normalized wrist-below-fingertip drop; the tip can't get lower than this above the frame bottom
+    wrist: tuple = (0.0, 0.0)
+    palm_size: float = 0.0
 
 
 def analyze(landmarks) -> GestureState:
@@ -95,6 +97,8 @@ def analyze(landmarks) -> GestureState:
     return GestureState(
         cursor=(landmarks[INDEX_TIP][0], landmarks[INDEX_TIP][1]),
         reach=max(0.0, wrist[1] - landmarks[INDEX_TIP][1]),
+        wrist=(wrist[0], wrist[1]),
+        palm_size=palm_size,
         active={
             "thumbs_up": thumbs_up,
             "peace": peace,
