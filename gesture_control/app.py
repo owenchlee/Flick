@@ -24,8 +24,14 @@ from .hand_tracker import Camera, HandTracker
 from .overlay import draw_cursor, draw_grid, draw_hud
 from .smoother import Smoother
 
-WINDOW_TITLE = "Thumb-Detector"
+WINDOW_TITLE = "Flick"
 FRAME_W, FRAME_H = 640, 480
+
+# Instant gestures (like, comments, ...) must be held this many consecutive
+# frames before firing, and released this many before they can fire again.
+# Filters the pose flicker a hand makes while curling at the end of a flick.
+HOLD_FRAMES = 3
+RELEASE_FRAMES = 5
 
 
 class GestureControlApp:
@@ -69,6 +75,12 @@ class GestureControlApp:
         self._flick_prev_y = None
         self._flick_prev_t = None
         self._flick_armed = True
+        # Per-gesture state for instant actions: a pose must be held for
+        # HOLD_FRAMES before it fires, fires once, and only re-arms after
+        # RELEASE_FRAMES of not being held.
+        self._held_frames = {gesture_id: 0 for gesture_id in GESTURE_IDS}
+        self._idle_frames = {gesture_id: 0 for gesture_id in GESTURE_IDS}
+        self._latched = {gesture_id: False for gesture_id in GESTURE_IDS}
 
     def _flash(self, text: str | None) -> None:
         if not text:
@@ -120,6 +132,10 @@ class GestureControlApp:
                     self._dispatch(state)
                 else:
                     self.executor.release_all_holds()
+                    for gesture_id in GESTURE_IDS:
+                        self._held_frames[gesture_id] = 0
+                        self._idle_frames[gesture_id] = 0
+                        self._latched[gesture_id] = False
                     self.smoother.reset()
                     self._cursor_history.clear()
                     self._flick_prev_y = None
@@ -178,7 +194,8 @@ class GestureControlApp:
             mapped_y = np.clip(mapped_y, 0, self.screen_h)
 
             sx, sy = self.smoother.smooth((mapped_x, mapped_y))
-            pyautogui.moveTo(sx, sy)
+            if self.config.settings.move_cursor:
+                pyautogui.moveTo(sx, sy)
             frame_px = (int(state.cursor[0] * FRAME_W), int(state.cursor[1] * FRAME_H))
             self._cursor_frame_px = frame_px
             self._cursor_history.append((frame_px, (sx, sy)))
@@ -189,7 +206,8 @@ class GestureControlApp:
             # not wherever the fingertip drifted to mid-curl.
             pre_curl_frame_px, pre_curl_screen_xy = self._cursor_history[0]
             self._cursor_frame_px = pre_curl_frame_px
-            pyautogui.moveTo(*pre_curl_screen_xy)
+            if self.config.settings.move_cursor:
+                pyautogui.moveTo(*pre_curl_screen_xy)
             self._cursor_history.clear()
 
         if self._cursor_frame_px is not None:
@@ -248,11 +266,21 @@ class GestureControlApp:
                 continue
 
             if not is_active:
+                self._held_frames[gesture_id] = 0
+                self._idle_frames[gesture_id] += 1
+                if self._idle_frames[gesture_id] >= RELEASE_FRAMES:
+                    self._latched[gesture_id] = False
+                continue
+
+            self._idle_frames[gesture_id] = 0
+            self._held_frames[gesture_id] += 1
+            if self._latched[gesture_id] or self._held_frames[gesture_id] < HOLD_FRAMES:
                 continue
 
             if now - self._cooldowns.get(gesture_id, 0.0) < self.config.settings.action_cooldown:
                 continue
 
+            self._latched[gesture_id] = True
             custom_hotkey = self.config.custom_hotkeys.get(gesture_id, "")
             scroll_amount = self.config.settings.scroll_sensitivity if spec.id == SCROLL_PREV else 0
             self._flash(self.executor.fire(spec.id, custom_hotkey=custom_hotkey, scroll_amount=scroll_amount))

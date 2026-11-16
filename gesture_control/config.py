@@ -50,6 +50,7 @@ SETTINGS_RANGES = {
 class Settings:
     camera_index: int = 0
     mirror: bool = True
+    move_cursor: bool = True
     show_landmarks: bool = True
     show_grid: bool = False
     smoothing: int = SETTINGS_RANGES["smoothing"][2]

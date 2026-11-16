@@ -1,4 +1,4 @@
-# Thumb-Detector
+# Flick
 
 [![Tests](https://github.com/owenchlee/Thumb-Detector/actions/workflows/tests.yml/badge.svg)](https://github.com/owenchlee/Thumb-Detector/actions/workflows/tests.yml)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
@@ -6,7 +6,7 @@
 
 Scroll and react to short-form video feeds — Reels, Shorts, TikTok — with hand gestures, using nothing but a webcam.
 
-Thumb-Detector tracks your hand in real time with MediaPipe and OpenCV. Point your index finger and flick it upward to advance to the next reel — no need to keep your hand raised the whole time. Thumbs up to like, a peace sign to open comments, hold a fist to bump playback to 2x speed, and a rock sign to go back to the previous reel. A companion desktop app lets you remap any gesture, or bind your own custom hotkey, without touching a line of code.
+Flick tracks your hand in real time with MediaPipe and OpenCV. Point your index finger and flick it upward to advance to the next reel — no need to keep your hand raised the whole time. Thumbs up to like, a peace sign to open comments, hold a fist to bump playback to 2x speed, and a rock sign to go back to the previous reel. A companion desktop app lets you remap any gesture, or bind your own custom hotkey, without touching a line of code.
 
 <p>
   <img src="assets/screenshot-hud.png" alt="Live HUD overlay showing hand tracking, gesture legend, and click feedback" width="49%" />

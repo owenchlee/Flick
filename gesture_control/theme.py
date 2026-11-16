@@ -1,4 +1,4 @@
-"""Shared design tokens for Thumb-Detector's two surfaces: the OpenCV HUD
+"""Shared design tokens for Flick's two surfaces: the OpenCV HUD
 overlay (video window) and the CustomTkinter configurator (settings window).
 
 Keeping one palette in one place means the live overlay and the settings

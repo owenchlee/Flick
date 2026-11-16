@@ -91,6 +91,7 @@ class HandTracker:
         self._landmarker = None
         self._connections = []
         self._start_time = time.monotonic()
+        self._last_timestamp_ms = -1
         self._thread = threading.Thread(
             target=self._init,
             args=(max_num_hands, min_detection_confidence, min_tracking_confidence),
@@ -123,7 +124,11 @@ class HandTracker:
     def process(self, rgb_frame):
         rgb_frame.flags.writeable = False
         image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=rgb_frame)
-        timestamp_ms = int((time.monotonic() - self._start_time) * 1000)
+        # MediaPipe requires strictly increasing timestamps; after a stall
+        # (e.g. screen recording starting) buffered frames can land in the
+        # same millisecond.
+        timestamp_ms = max(int((time.monotonic() - self._start_time) * 1000), self._last_timestamp_ms + 1)
+        self._last_timestamp_ms = timestamp_ms
         result = self._landmarker.detect_for_video(image, timestamp_ms)
         rgb_frame.flags.writeable = True
         return _Result(result.hand_landmarks)
