@@ -20,3 +20,8 @@ gesture_control/_models/
 # OS cruft
 .DS_Store
 Thumbs.db
+
+# local secrets
+.env
+.env.*
+!.env.example
