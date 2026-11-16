@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from tkinter import messagebox
 from pathlib import Path
 
 import customtkinter as ctk
@@ -219,6 +220,8 @@ class ConfiguratorApp(ctk.CTk):
 
         self.config = load_config()
         self._dirty = False
+        self._proc = None
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.title("Thumb-Detector — Configurator")
         self.geometry("880x680")
@@ -441,14 +444,29 @@ class ConfiguratorApp(ctk.CTk):
         save_config(self.config)
         self._dirty = False
         self.status_label.configure(text="Saved ✓", text_color=theme.SUCCESS)
-        self.after(2500, lambda: self.status_label.configure(text=""))
+        self.after(2500, self._clear_status)
+
+    def _clear_status(self):
+        if not self._dirty:  # keep the "Unsaved changes" warning
+            self.status_label.configure(text="")
+
+    def _on_close(self):
+        if self._dirty and not messagebox.askokcancel(
+                "Unsaved changes", "Discard unsaved changes and close?"):
+            return
+        self.destroy()
 
     def _save_and_launch(self):
         self._save()
-        subprocess.Popen([sys.executable, str(MAIN_PY)], cwd=str(MAIN_PY.parent))
+        if self._proc is not None and self._proc.poll() is None:
+            self.status_label.configure(text="Saved ✓ · Already running", text_color=theme.SUCCESS)
+            return
+        self._proc = subprocess.Popen([sys.executable, str(MAIN_PY)], cwd=str(MAIN_PY.parent))
         self.status_label.configure(text="Saved ✓ · Launching…", text_color=theme.SUCCESS)
 
     def _reset_defaults(self):
+        if not messagebox.askyesno("Reset to Defaults", "Overwrite all settings with defaults?"):
+            return
         self.config = AppConfig.default()
         save_config(self.config)
         self.destroy()
