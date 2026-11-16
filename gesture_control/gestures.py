@@ -31,11 +31,13 @@ def _dist(a, b) -> float:
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
-def _finger_extended(landmarks, wrist, pip_idx: int, tip_idx: int, factor: float = 1.05) -> bool:
+def _finger_extended(landmarks, wrist, pip_idx: int, tip_idx: int, margin: float = 0.16, palm: float = 1.0) -> bool:
     """A finger reads as extended when its tip sits farther from the wrist
     than its own PIP joint does — robust to hand rotation/tilt, unlike a
     naive "tip.y < pip.y" check that only works on an upright hand."""
-    return _dist(wrist, landmarks[tip_idx]) > _dist(wrist, landmarks[pip_idx]) * factor
+    tip_d = _dist(wrist, landmarks[tip_idx])
+    # Also require the tip to clear the MCP (pip_idx - 1) by a margin: a second, independent cue against jitter.
+    return tip_d > _dist(wrist, landmarks[pip_idx]) + margin * palm and tip_d > _dist(wrist, landmarks[pip_idx - 1]) + 0.45 * palm
 
 
 @dataclass
@@ -52,21 +54,26 @@ def analyze(landmarks) -> GestureState:
     wrist = landmarks[WRIST]
     palm_size = max(_dist(wrist, landmarks[MIDDLE_MCP]), 1e-6)
 
-    index_ext = _finger_extended(landmarks, wrist, INDEX_PIP, INDEX_TIP)
-    middle_ext = _finger_extended(landmarks, wrist, MIDDLE_PIP, MIDDLE_TIP)
-    ring_ext = _finger_extended(landmarks, wrist, RING_PIP, RING_TIP)
-    pinky_ext = _finger_extended(landmarks, wrist, PINKY_PIP, PINKY_TIP)
+    index_ext = _finger_extended(landmarks, wrist, INDEX_PIP, INDEX_TIP, palm=palm_size)
+    middle_ext = _finger_extended(landmarks, wrist, MIDDLE_PIP, MIDDLE_TIP, palm=palm_size)
+    ring_ext = _finger_extended(landmarks, wrist, RING_PIP, RING_TIP, margin=0.40, palm=palm_size)
+    pinky_ext = _finger_extended(landmarks, wrist, PINKY_PIP, PINKY_TIP, margin=0.40, palm=palm_size)  # short finger: needs a larger margin to reject jitter
     four_curled = not any((index_ext, middle_ext, ring_ext, pinky_ext))
 
     thumb_tip = landmarks[THUMB_TIP]
     thumb_mcp = landmarks[THUMB_MCP]
-    thumb_ext = _dist(wrist, thumb_tip) > _dist(wrist, thumb_mcp) * 1.05
-    vertical_margin = palm_size * 0.15
-    thumb_points_up = thumb_tip[1] < thumb_mcp[1] - vertical_margin
-    thumb_near_palm = _dist(thumb_tip, landmarks[INDEX_MCP]) < palm_size * 0.55
+    thumb_ext = _dist(wrist, thumb_tip) > _dist(wrist, thumb_mcp) * 1.4 and _dist(wrist, thumb_tip) > _dist(wrist, landmarks[3]) + 0.07 * palm_size
+    vertical_margin = palm_size * 0.5
+    # Project onto the hand's own axis (wrist -> middle MCP) so it holds under rotation/mirroring.
+    mid = landmarks[MIDDLE_MCP]
+    ax, ay = (mid[0] - wrist[0]) / palm_size, (mid[1] - wrist[1]) / palm_size
+    thumb_points_up = ((thumb_tip[0] - landmarks[3][0] + thumb_tip[0] - thumb_mcp[0]) * ax + (thumb_tip[1] - landmarks[3][1] + thumb_tip[1] - thumb_mcp[1]) * ay) / 2 > vertical_margin
+    # Measure to the index/middle knuckle midpoint: a more central target is less jitter-sensitive than one knuckle.
+    knuckle_mid = ((landmarks[INDEX_MCP][0] + mid[0]) / 2, (landmarks[INDEX_MCP][1] + mid[1]) / 2)
+    thumb_near_palm = _dist(thumb_tip, knuckle_mid) < palm_size * 0.40
 
     thumbs_up = four_curled and thumb_ext and thumb_points_up
-    fist = four_curled and thumb_near_palm
+    fist = four_curled and (thumb_near_palm or not thumbs_up)
     peace = index_ext and middle_ext and not ring_ext and not pinky_ext
     # "Rock on" sign — index + pinky extended, middle/ring curled. Reserved
     # as a pose distinct from "point" (which only extends the index finger)
